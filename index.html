@@ -1,0 +1,1884 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IMAI — Actividad Industrial</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Playfair+Display:wght@600;700&display=swap');
+
+  :root {
+    --navy:#001A4E;--navy2:#0A2D6E;--navy-lt:#1A4090;
+    --green:#005C3F;--green2:#007A56;--green-lt:#00A372;
+    --red:#AE001C;--gold:#7A5C1E;
+    --bg:#EDEEF2;--surface:#FFFFFF;--surf2:#F6F7FA;--surf3:#ECEEF3;
+    --border:#CDD0DA;--border2:#DDE0E8;
+    --text:#0C1220;--text2:#374057;--text3:#6B7590;--text4:#9BA4B8;
+    --pos:#005030;--neg:#AE001C;--pos-bg:#E3F5EC;--neg-bg:#FDEAED;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:13px;-webkit-font-smoothing:antialiased}
+
+  .header{background:linear-gradient(160deg,#001040 0%,#002070 60%,#003090 100%);color:white;padding:0 40px;display:flex;align-items:stretch;justify-content:space-between;border-bottom:3px solid var(--green-lt);box-shadow:0 3px 16px rgba(0,16,64,0.22);min-height:68px;position:sticky;top:0;z-index:100}
+  .header-left{display:flex;flex-direction:column;justify-content:center;padding:14px 0;gap:5px}
+  .header-title{font-family:'Playfair Display',Georgia,serif;font-size:21px;font-weight:700;letter-spacing:-0.3px}
+  .header-sub{font-size:10px;color:rgba(255,255,255,0.45);font-family:'IBM Plex Mono',monospace;letter-spacing:1.1px}
+  .header-right{display:flex;align-items:center;gap:12px;padding-left:28px;margin-left:28px;border-left:1px solid rgba(255,255,255,0.1)}
+  .header-tag{background:var(--green2);color:white;padding:5px 13px;border-radius:5px;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:500;letter-spacing:1.8px}
+  .header-date{font-family:'IBM Plex Mono',monospace;font-size:10px;color:rgba(255,255,255,0.45);white-space:nowrap}
+  .base-indicator{font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:500;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.8);padding:4px 10px;border-radius:5px;white-space:nowrap}
+
+  .ctrl-panel{background:var(--surface);border-bottom:2px solid var(--navy);box-shadow:0 3px 14px rgba(0,26,78,0.1)}
+
+  /* Row 1: view tabs + filter chips */
+  .ctrl-row-main{display:flex;align-items:stretch;padding:0 40px;min-height:46px;flex-wrap:wrap}
+
+  /* View tabs — premium underline style */
+  .view-tab-group{display:flex;align-items:stretch;margin-right:4px}
+  .view-tab{background:transparent;border:none;color:var(--text3);padding:0 16px;cursor:pointer;font-size:12.5px;font-weight:500;font-family:'Inter',sans-serif;transition:all 0.15s;position:relative;white-space:nowrap;display:flex;align-items:center;gap:7px}
+  .view-tab::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--border);transition:all 0.15s;flex-shrink:0}
+  .view-tab:hover{color:var(--navy2)}
+  .view-tab:hover::before{background:var(--navy-lt)}
+  .view-tab.active{color:var(--navy);font-weight:700}
+  .view-tab.active::before{background:var(--navy)}
+  .view-tab.active::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;background:var(--navy);border-radius:2px 2px 0 0}
+
+  /* Vertical separator */
+  .ctrl-sep{width:1px;height:20px;background:var(--border2);align-self:center;margin:0 14px;flex-shrink:0}
+
+  /* Compact chip groups for Frecuencia / Mostrar / Escala */
+  .ctrl-chip-label{font-size:9px;font-weight:700;color:var(--text4);text-transform:uppercase;letter-spacing:0.9px;white-space:nowrap;margin-right:5px;align-self:center}
+  .ctrl-chip-group{display:flex;gap:2px;align-items:center;align-self:center;transition:opacity 0.2s,filter 0.2s}
+  .ctrl-chip-group.freq-disabled{opacity:0.28;pointer-events:none;filter:grayscale(0.6)}
+  .ctrl-chip{background:transparent;border:1px solid transparent;color:var(--text3);padding:5px 10px;cursor:pointer;font-size:11px;font-weight:500;font-family:'Inter',sans-serif;transition:all 0.12s;border-radius:6px;white-space:nowrap}
+  .ctrl-chip:hover{background:var(--surf2);color:var(--navy);border-color:var(--border2)}
+  .ctrl-chip.active{background:var(--navy);color:white;border-color:var(--navy);font-weight:600;box-shadow:0 1px 5px rgba(0,26,78,0.25)}
+
+  /* Row 2: period selectors */
+  .ctrl-period-row{display:flex;align-items:center;padding:0 40px;min-height:38px;background:linear-gradient(180deg,var(--surf2),var(--surface));border-top:1px solid var(--border2);gap:10px}
+  .ctrl-period-row select{border:1px solid var(--border);background:var(--surface);color:var(--text);padding:5px 9px;font-family:'IBM Plex Mono',monospace;font-size:11px;border-radius:6px;cursor:pointer;outline:none;transition:border-color 0.15s}
+  .ctrl-period-row select:hover{border-color:var(--navy-lt)}
+  .ctrl-info{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text3);white-space:nowrap;background:var(--surf3);padding:4px 10px;border-radius:6px;border:1px solid var(--border2)}
+  .ctrl-arrow{color:var(--text4);font-size:13px;margin:0 2px}
+
+  .action-btn{display:flex;align-items:center;gap:7px;background:linear-gradient(135deg,var(--navy),var(--navy2));border:none;color:white;padding:7px 16px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:600;font-family:'Inter',sans-serif;transition:all 0.15s ease;white-space:nowrap;box-shadow:0 2px 6px rgba(0,26,78,0.2)}
+  .action-btn:hover{background:linear-gradient(135deg,var(--navy2),#003590);box-shadow:0 3px 10px rgba(0,26,78,0.3);transform:translateY(-1px)}
+
+  .main{padding:28px 40px 56px;max-width:1900px;margin:0 auto}
+
+  .summary-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:40px}
+  .sum-card{background:var(--surface);border:1px solid var(--border2);border-radius:12px;padding:18px 20px 16px;border-top:3px solid var(--c);box-shadow:0 1px 5px rgba(0,0,0,0.05);transition:box-shadow 0.2s,transform 0.15s;cursor:default}
+  .sum-card:hover{box-shadow:0 6px 22px rgba(0,0,0,0.1);transform:translateY(-1px)}
+  .sum-label{font-size:9px;text-transform:uppercase;letter-spacing:1.3px;color:var(--text3);font-weight:700;margin-bottom:10px}
+  .sum-val{font-family:'IBM Plex Mono',monospace;font-size:30px;font-weight:500;color:var(--navy);line-height:1;margin-bottom:5px;letter-spacing:-0.5px}
+  .sum-period{font-size:9px;color:var(--text4);margin-bottom:10px}
+  .sum-badge{font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:500;padding:3px 9px;border-radius:5px;display:inline-block}
+  .sum-badge.pos{background:var(--pos-bg);color:var(--pos)}
+  .sum-badge.neg{background:var(--neg-bg);color:var(--neg)}
+  .sum-badge.neu{background:var(--surf3);color:var(--text3)}
+
+  .sector-header{display:flex;align-items:center;gap:14px;padding:20px 0 13px;margin-top:10px;border-bottom:2px solid var(--border);margin-bottom:18px}
+  .sector-accent{width:5px;height:32px;border-radius:3px;flex-shrink:0}
+  .sector-name{font-family:'Playfair Display',Georgia,serif;font-size:21px;font-weight:700;color:var(--navy);letter-spacing:-0.4px}
+  .sector-scian{font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:500;background:var(--navy);color:white;padding:4px 9px;border-radius:5px;letter-spacing:0.8px}
+  .sector-val{margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:500;color:var(--text2);white-space:nowrap}
+
+  .cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(530px,1fr));gap:16px;margin-bottom:10px}
+
+  .card{background:var(--surface);border:1px solid var(--border2);border-radius:12px;overflow:hidden;border-left:4px solid var(--c,var(--navy));box-shadow:0 1px 4px rgba(0,0,0,0.05);transition:box-shadow 0.2s,transform 0.15s}
+  .card:hover{box-shadow:0 6px 24px rgba(0,0,0,0.1);transform:translateY(-1px)}
+  .card-top{display:flex;align-items:flex-start;justify-content:space-between;padding:13px 15px 11px;background:linear-gradient(180deg,var(--surf2) 0%,rgba(246,247,250,0) 100%);border-bottom:1px solid var(--border2);gap:8px}
+  .card-title{font-size:13.5px;font-weight:600;color:var(--text);line-height:1.35;flex:1;min-width:0}
+  .card-scian{font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:500;background:var(--surf3);color:var(--text3);padding:3px 8px;border-radius:5px;border:1px solid var(--border2);flex-shrink:0}
+
+  .card-signal{padding:6px 15px;border-bottom:1px solid var(--border2);display:flex;align-items:center;gap:7px;background:var(--surf2);min-height:32px}
+  .signal-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+  .signal-text{font-size:11px;font-weight:700;letter-spacing:0.1px}
+  .signal-sep{color:var(--border);font-size:11px}
+  .signal-sub{font-size:10px;color:var(--text3)}
+
+  .card-metrics{display:flex;padding:11px 15px 9px;border-bottom:1px solid var(--border2);gap:0}
+  .metric{flex:1;padding-right:14px;border-right:1px solid var(--border2);margin-right:14px}
+  .metric:last-child{border-right:none;margin-right:0;padding-right:0}
+  .m-label{font-size:9px;text-transform:uppercase;letter-spacing:0.8px;color:var(--text3);font-weight:700;margin-bottom:4px}
+  .m-val{font-family:'IBM Plex Mono',monospace;font-size:19px;font-weight:500;color:var(--navy);line-height:1;letter-spacing:-0.3px}
+  .m-chg{font-family:'IBM Plex Mono',monospace;font-size:10px;margin-top:3px;font-weight:500}
+  .m-chg.pos{color:var(--pos)}
+  .m-chg.neg{color:var(--neg)}
+  .m-chg.neu{color:var(--text3)}
+
+  .card-statbar{display:flex;padding:7px 15px;border-bottom:1px solid var(--border2);background:linear-gradient(to right,var(--surf2),var(--surf3));gap:0}
+  .stat-item{flex:1;padding-right:12px;border-right:1px solid var(--border);margin-right:12px}
+  .stat-item:last-child{border-right:none;margin-right:0;padding-right:0}
+  .stat-label{font-size:8.5px;text-transform:uppercase;letter-spacing:0.7px;color:var(--text3);font-weight:600;margin-bottom:2px}
+  .stat-val{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:500;color:var(--text2)}
+  .stat-val.highlight{color:var(--green2);font-weight:600}
+  .stat-val.lowlight{color:var(--neg);font-weight:600}
+
+  .charts-row{display:grid;grid-template-columns:1fr 1fr 1fr;padding:10px 15px 13px;gap:0}
+  .chart-cell{padding:0 10px;border-right:1px solid var(--border2);cursor:pointer;position:relative;border-radius:5px;transition:background 0.15s}
+  .chart-cell:first-child{padding-left:0}
+  .chart-cell:last-child{border-right:none;padding-right:0}
+  .chart-cell:hover{background:var(--surf2)}
+  .ch-label{font-size:8.5px;text-transform:uppercase;letter-spacing:0.9px;color:var(--text3);font-weight:700;margin-bottom:5px;text-align:center}
+  canvas{display:block;width:100%!important}
+
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,8,28,0.65);z-index:1000;align-items:center;justify-content:center;backdrop-filter:blur(5px)}
+  .modal-overlay.open{display:flex}
+  .modal-box{background:var(--surface);border-radius:14px;border:1px solid var(--border2);width:94vw;max-width:1240px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 28px 90px rgba(0,0,0,0.4)}
+  .modal-header{display:flex;align-items:center;justify-content:space-between;padding:18px 26px;background:linear-gradient(150deg,#001040,#0A2D6E);color:white;border-bottom:2px solid var(--green-lt)}
+  .modal-title{font-family:'Playfair Display',Georgia,serif;font-size:19px;font-weight:700;line-height:1.2}
+  .modal-meta{font-family:'IBM Plex Mono',monospace;font-size:10px;color:rgba(255,255,255,0.45);margin-top:4px}
+  .modal-close{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.18);color:white;font-size:15px;width:36px;height:36px;border-radius:7px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.15s}
+  .modal-close:hover{background:rgba(255,255,255,0.22)}
+  .modal-body{padding:26px 30px;overflow-y:auto;flex:1}
+  .modal-charts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:26px}
+  .modal-chart-cell{display:flex;flex-direction:column;gap:8px}
+  .modal-chart-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text3);text-align:center}
+
+  .data-table{width:100%;border-collapse:collapse;font-size:11px}
+  .data-table th{background:var(--navy);color:rgba(255,255,255,0.85);padding:9px 11px;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:0.6px;text-align:right;white-space:nowrap;position:sticky;top:0;z-index:2;border-right:1px solid rgba(255,255,255,0.1)}
+  .data-table th:first-child{text-align:left;min-width:230px;position:sticky;left:0;z-index:3;background:var(--navy2);border-right:2px solid rgba(255,255,255,0.15)}
+  .data-table td{padding:6px 11px;border-bottom:1px solid var(--border2);text-align:right;font-family:'IBM Plex Mono',monospace;font-size:11px;white-space:nowrap;border-right:1px solid var(--border2)}
+  .data-table td:first-child{text-align:left;font-family:'Inter',sans-serif;font-weight:500;color:var(--text2);font-size:11px;background:var(--surf2);position:sticky;left:0;z-index:1;border-right:2px solid var(--border)}
+  .data-table tr:nth-child(odd) td:not(:first-child){background:#FAFBFD}
+  .data-table tr:hover td{background:#EBF0FF!important}
+  .data-table .pos-cell{color:var(--pos);font-weight:600}
+  .data-table .neg-cell{color:var(--neg);font-weight:600}
+
+  .rebase-overlay{display:none;position:fixed;inset:0;background:rgba(0,8,28,0.6);z-index:1100;align-items:center;justify-content:center;backdrop-filter:blur(5px)}
+  .rebase-overlay.open{display:flex}
+  .rebase-box{background:var(--surface);border-radius:14px;border:1px solid var(--border2);width:540px;max-width:96vw;box-shadow:0 28px 80px rgba(0,0,0,0.35);overflow:hidden}
+  .rebase-header{background:linear-gradient(150deg,#001040,#0A2D6E);color:white;padding:18px 24px;border-bottom:2px solid var(--green-lt);display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+  .rebase-header h3{font-family:'Playfair Display',serif;font-size:17px;font-weight:700}
+  .rebase-header p{font-size:11px;color:rgba(255,255,255,0.5);font-family:'IBM Plex Mono',monospace;margin-top:4px}
+  .rebase-close{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.18);color:white;font-size:14px;width:32px;height:32px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.15s}
+  .rebase-close:hover{background:rgba(255,255,255,0.22)}
+  .rebase-body{padding:24px}
+  .rb-section{margin-bottom:22px}
+  .rb-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .rb-title::after{content:'';flex:1;height:1px;background:var(--border2)}
+  .rb-type-group{display:flex;gap:0;border-radius:8px;overflow:hidden;border:1.5px solid var(--border);margin-bottom:14px}
+  .rb-type-btn{flex:1;background:white;border:none;color:var(--text2);padding:10px 0;cursor:pointer;font-size:13px;font-weight:500;font-family:'Inter',sans-serif;transition:all 0.13s;border-right:1px solid var(--border)}
+  .rb-type-btn:last-child{border-right:none}
+  .rb-type-btn:hover{background:var(--surf2)}
+  .rb-type-btn.active{background:var(--navy);color:white}
+  .rb-selects{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .rb-select-wrap{display:flex;flex-direction:column;gap:4px;flex:1;min-width:100px}
+  .rb-select-label{font-size:9px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px}
+  .rb-select{border:1.5px solid var(--border);background:var(--surf2);color:var(--text);padding:8px 12px;font-family:'IBM Plex Mono',monospace;font-size:12px;border-radius:7px;cursor:pointer;outline:none;transition:border-color 0.15s;width:100%}
+  .rb-preview{background:linear-gradient(135deg,#EEF1F8,#E8EDF6);border:1px solid var(--border2);border-radius:8px;padding:12px 16px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text2);line-height:1.6}
+  .rb-preview strong{color:var(--navy)}
+  .rb-dl-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .rb-dl-btn{display:flex;align-items:center;justify-content:center;gap:8px;padding:12px 16px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;font-family:'Inter',sans-serif;transition:all 0.15s;border:1.5px solid;text-decoration:none}
+  .rb-dl-btn.primary{background:var(--navy);color:white;border-color:var(--navy);box-shadow:0 2px 8px rgba(0,26,78,0.2)}
+  .rb-dl-btn.primary:hover{background:var(--navy2);box-shadow:0 4px 14px rgba(0,26,78,0.3)}
+  .rb-dl-btn.secondary{background:white;color:var(--text2);border-color:var(--border2)}
+  .rb-dl-btn.secondary:hover{border-color:var(--navy2);color:var(--navy2)}
+  .rb-dl-btn.full{grid-column:1/-1;background:var(--green2);border-color:var(--green2);color:white}
+  .rb-dl-btn.full:hover{background:var(--green)}
+
+  .msg-container{max-width:1400px;margin:0 auto}
+  .msg-selector{background:var(--surface);border:1px solid var(--border2);border-radius:12px;padding:20px 24px;margin-bottom:24px;box-shadow:0 1px 4px rgba(0,0,0,0.05)}
+  .msg-sel-row{display:flex;gap:20px;align-items:flex-end;flex-wrap:wrap}
+  .msg-sel-group{display:flex;flex-direction:column;gap:6px}
+  .msg-sel-group.wide{flex:1;min-width:250px}
+  .msg-sel-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.1px;color:var(--text3)}
+  .msg-sel-dropdown{border:1px solid var(--border);background:var(--surf2);color:var(--text);padding:10px 14px;font-family:'Inter',sans-serif;font-size:13px;border-radius:8px;cursor:pointer;outline:none;width:100%}
+  .msg-series-toggles{display:flex;gap:8px;flex-wrap:wrap}
+  .msg-toggle-btn{padding:10px 18px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;font-family:'Inter',sans-serif;transition:all 0.18s ease;border:1px solid var(--border);background:white;color:var(--text3)}
+  .msg-toggle-btn:hover{border-color:var(--navy2);color:var(--navy)}
+  .msg-toggle-btn.active-org{background:rgba(26,86,196,0.12);border-color:#1A56C4;color:#1A56C4}
+  .msg-toggle-btn.active-des{background:rgba(192,0,29,0.12);border-color:#C0001D;color:#C0001D}
+  .msg-toggle-btn.active-tend{background:rgba(0,123,94,0.12);border-color:#007B5E;color:#007B5E}
+  .msg-toggle-btn.disabled{opacity:0.5;cursor:not-allowed;pointer-events:none}
+  .msg-content{display:grid;grid-template-columns:1.2fr 1fr;gap:24px;align-items:start}
+  .msg-chart-panel{background:var(--surface);border:1px solid var(--border2);border-radius:12px;padding:20px 24px;box-shadow:0 1px 4px rgba(0,0,0,0.05)}
+  .msg-chart-title{font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:var(--navy);margin-bottom:6px}
+  .msg-chart-meta{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text3);margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border2)}
+  .msg-chart-canvas{margin-bottom:12px;height:280px;position:relative}
+  .msg-chart-legend{display:flex;gap:16px;justify-content:center;font-size:10px;padding-top:8px}
+  .msg-legend-item{display:flex;align-items:center;gap:6px}
+  .msg-legend-dot{width:10px;height:10px;border-radius:2px}
+  .msg-text-panel{background:var(--surface);border:1px solid var(--border2);border-radius:12px;padding:20px 24px;box-shadow:0 1px 4px rgba(0,0,0,0.05)}
+  .msg-text-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.1px;color:var(--text3);margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border2)}
+  .msg-item{padding:12px 0;border-bottom:1px solid var(--border2)}
+  .msg-item:last-child{border-bottom:none}
+  .msg-item-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.9px;color:var(--text3);margin-bottom:6px}
+  .msg-item-text{font-size:13px;line-height:1.5;color:var(--text2);font-weight:400}
+  .msg-item-text strong{color:var(--navy);font-weight:600}
+  .msg-item-text .pos{color:var(--pos);font-weight:600}
+  .msg-item-text .neg{color:var(--neg);font-weight:600}
+  .msg-empty{text-align:center;padding:60px 20px;color:var(--text3);font-size:13px}
+
+  .contrib-container{max-width:1400px;margin:0 auto}
+  .contrib-config{background:var(--surface);border:1px solid var(--border2);border-radius:12px;padding:20px 24px;margin-bottom:24px;box-shadow:0 1px 4px rgba(0,0,0,0.05)}
+  .contrib-config-row{display:flex;gap:20px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px}
+  .contrib-config-row:last-child{margin-bottom:0}
+  .contrib-config-group{display:flex;flex-direction:column;gap:6px}
+  .contrib-config-group.wide{flex:1;min-width:250px}
+  .contrib-config-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.1px;color:var(--text3)}
+  .contrib-select{border:1px solid var(--border);background:var(--surf2);color:var(--text);padding:10px 14px;font-family:'Inter',sans-serif;font-size:13px;border-radius:8px;cursor:pointer;outline:none;width:100%}
+  .contrib-chips{display:flex;gap:8px;flex-wrap:wrap;padding:10px 0}
+  .contrib-chip{padding:8px 16px;border-radius:20px;cursor:pointer;font-size:11px;font-weight:600;font-family:'Inter',sans-serif;transition:all 0.18s ease;border:1px solid var(--border);background:white;color:var(--text3);display:flex;align-items:center;gap:8px}
+  .contrib-chip:hover{border-color:var(--navy2);color:var(--navy)}
+  .contrib-chip.active{background:var(--navy);color:white;border-color:var(--navy)}
+  .contrib-chip .chip-dot{width:8px;height:8px;border-radius:50%}
+  .contrib-controls{display:flex;gap:12px;align-items:center;margin-top:12px}
+  .contrib-scale-toggle{display:flex;border-radius:6px;overflow:hidden;border:1px solid var(--border);background:var(--surf2)}
+  .scale-btn{padding:8px 14px;border:none;background:transparent;color:var(--text3);font-size:11px;font-weight:500;font-family:'Inter',sans-serif;cursor:pointer;transition:all 0.15s;border-right:1px solid var(--border)}
+  .scale-btn:last-child{border-right:none}
+  .scale-btn:hover{color:var(--navy);background:rgba(0,26,78,0.05)}
+  .scale-btn.active{background:var(--navy);color:white}
+  .contrib-download-btn{display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:6px;border:1px solid var(--green2);background:white;color:var(--green2);font-size:11px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer;transition:all 0.15s}
+  .contrib-download-btn:hover{background:var(--green2);color:white}
+  .contrib-chart-panel{background:var(--surface);border:1px solid var(--border2);border-radius:12px;padding:24px;box-shadow:0 1px 4px rgba(0,0,0,0.05)}
+  .contrib-chart-title{font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:var(--navy);margin-bottom:6px}
+  .contrib-chart-subtitle{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text3);margin-bottom:20px}
+  .contrib-canvas-wrap{height:400px;position:relative}
+  .contrib-legend{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-top:16px;padding-top:16px;border-top:1px solid var(--border2);font-size:11px}
+  .contrib-legend-item{display:flex;align-items:center;gap:6px}
+  .contrib-legend-dot{width:12px;height:12px;border-radius:3px}
+  .contrib-legend-line{width:20px;height:3px;border-radius:2px}
+
+</style>
+</head>
+<body>
+<div id="loadingOverlay" style="position:fixed;inset:0;background:#EDEEF2;display:flex;align-items:center;justify-content:center;z-index:9999;font-family:Inter,sans-serif;font-size:13px;color:#374057"><div style="text-align:center"><div style="margin-bottom:8px;font-weight:500">Cargando datos...</div><div style="color:#9BA4B8;font-size:11px">IQYs/Data.xlsx</div></div></div>
+
+<div class="header">
+  <div class="header-left">
+    <div class="header-title">Indicador Mensual de la Actividad Industrial</div>
+    <div class="header-sub">INEGI · BIE · SCIAN 2018</div>
+  </div>
+  <div class="header-right">
+    <div class="base-indicator" id="baseIndicator">BASE 2018 = 100</div>
+    <div class="header-tag">IMAI</div>
+    <div class="header-date" id="lastPeriodHdr"></div>
+  </div>
+</div>
+
+<div class="ctrl-panel">
+  <!-- Row 1: view tabs + filter chips -->
+  <div class="ctrl-row-main">
+    <div class="view-tab-group">
+      <button class="view-tab active" data-grp="view" onclick="setView('graficas',this)">Gráficas</button>
+      <button class="view-tab" data-grp="view" onclick="setView('tablas',this)">Tablas</button>
+      <button class="view-tab" data-grp="view" onclick="setView('mensajes',this)">Mensajes</button>
+      <button class="view-tab" data-grp="view" onclick="setView('contribuciones',this)">Contribuciones</button>
+    </div>
+    <div class="ctrl-sep"></div>
+    <span class="ctrl-chip-label">Frecuencia</span>
+    <div class="ctrl-chip-group" id="freqChipGroup">
+      <button class="ctrl-chip active" data-grp="freq" onclick="setFreq('M',this)">Mensual</button>
+      <button class="ctrl-chip" data-grp="freq" onclick="setFreq('Q',this)">Trimestral</button>
+      <button class="ctrl-chip" data-grp="freq" onclick="setFreq('A',this)">Anual</button>
+    </div>
+    <div class="ctrl-sep"></div>
+    <span class="ctrl-chip-label">Mostrar</span>
+    <div class="ctrl-chip-group">
+      <button class="ctrl-chip active" data-grp="mode" onclick="setMode('variaciones',this)">Variaciones</button>
+      <button class="ctrl-chip" data-grp="mode" onclick="setMode('niveles',this)">Niveles</button>
+    </div>
+    <div id="graficasScaleCg" style="display:none;align-items:center">
+      <div class="ctrl-sep"></div>
+      <span class="ctrl-chip-label">Escala</span>
+      <div class="ctrl-chip-group">
+        <button class="ctrl-chip active" id="gScaleAuto" onclick="setGraficasScale('auto',this)">Acotada</button>
+        <button class="ctrl-chip" id="gScaleFull" onclick="setGraficasScale('full',this)">Completa</button>
+      </div>
+    </div>
+  </div>
+  <!-- Row 2: period selectors + action -->
+  <div class="ctrl-period-row">
+    <span class="ctrl-chip-label" style="margin-right:4px">Periodo</span>
+    <select id="selFrom"></select>
+    <span class="ctrl-arrow">→</span>
+    <select id="selTo"></select>
+    <div class="ctrl-info" id="rangeInfo"></div>
+    <div style="margin-left:auto">
+      <button class="action-btn" onclick="openRebase()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v10"/></svg>
+        Cambiar base
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="rebase-overlay" id="rebaseOverlay" onclick="closeRebaseOuter(event)">
+  <div class="rebase-box">
+    <div class="rebase-header">
+      <div><h3>Cambiar base del indice</h3><p>Reindexar todas las series a un periodo de referencia distinto</p></div>
+      <button class="rebase-close" onclick="closeRebase()">&#10005;</button>
+    </div>
+    <div class="rebase-body">
+      <div class="rb-section">
+        <div class="rb-title">Tipo de periodo base</div>
+        <div class="rb-type-group">
+          <button class="rb-type-btn active" data-rbtype="A" onclick="setRbType('A',this)">Ano</button>
+          <button class="rb-type-btn" data-rbtype="Q" onclick="setRbType('Q',this)">Trimestre</button>
+          <button class="rb-type-btn" data-rbtype="M" onclick="setRbType('M',this)">Mes</button>
+        </div>
+        <div class="rb-selects" id="rbSelects"></div>
+      </div>
+      <div class="rb-section">
+        <div class="rb-title">Vista previa</div>
+        <div class="rb-preview" id="rbPreview">Selecciona un periodo para ver la vista previa.</div>
+      </div>
+      <div class="rb-section" style="margin-bottom:0">
+        <div class="rb-title">Aplicar y descargar</div>
+        <div class="rb-dl-grid">
+          <button class="rb-dl-btn primary" onclick="applyRebase()">Aplicar al dashboard</button>
+          <button class="rb-dl-btn secondary" onclick="downloadCSV('org')">Descargar original</button>
+          <button class="rb-dl-btn secondary" onclick="downloadCSV('des')">Descargar desest.</button>
+          <button class="rb-dl-btn full" onclick="downloadCSV('all')">Descargar todo (original + desest. + tendencia)</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div><div class="modal-title" id="modalTitle"></div><div class="modal-meta" id="modalMeta"></div></div>
+      <button class="modal-close" onclick="closeModalBtn()">&#10005;</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="summary-grid" id="summaryGrid"></div>
+  <div id="sectorsContainer"></div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════════════════
+// GLOBAL DATA
+// ══════════════════════════════════════════════════════════════════════════════
+let RAW;           // {periods:[], series:{SCIAN:{name,scian,sector,org,des,tend}}}
+let ESTRUCTURA;    // {periods:[], data:{SCIAN:[]}}  — original structure
+let ESTRUCTURA_D;  // {periods:[], data:{SCIAN:[]}}  — desestacionalizada structure
+let PIB18;         // {SCIAN: weight}  — base year 2018 fixed weights from PIB18 sheet
+
+// Series definitions - hasDesOrig indicates if DES/TEND exist
+const SERIES_DEFS = [
+  {scian:'IMAI',  name:'Total Actividad Industrial',                         sector:'total',        hasDesOrig:true},
+  {scian:'21',    name:'Total Mineria',                                      sector:'mineria',      hasDesOrig:false},
+  {scian:'211',   name:'Extraccion de petroleo y gas',                       sector:'mineria',      hasDesOrig:true},
+  {scian:'212',   name:'Mineria metalica y no metalica',                     sector:'mineria',      hasDesOrig:true},
+  {scian:'213',   name:'Servicios relacionados con la mineria',              sector:'mineria',      hasDesOrig:true},
+  {scian:'22',    name:'Energia electrica, agua y gas',                      sector:'energia',      hasDesOrig:false},
+  {scian:'221',   name:'Generacion y distribucion de energia',               sector:'energia',      hasDesOrig:false},
+  {scian:'23',    name:'Total Construccion',                                 sector:'construccion', hasDesOrig:false},
+  {scian:'236',   name:'Edificacion',                                        sector:'construccion', hasDesOrig:true},
+  {scian:'237',   name:'Construccion de obras de ingenieria civil',          sector:'construccion', hasDesOrig:true},
+  {scian:'238',   name:'Trabajos especializados para la construccion',       sector:'construccion', hasDesOrig:true},
+  {scian:'31-33', name:'Total Manufacturas',                                 sector:'manufactura',  hasDesOrig:false},
+  {scian:'311',   name:'Industria alimentaria',                              sector:'manufactura',  hasDesOrig:true},
+  {scian:'312',   name:'Industria de las bebidas y del tabaco',              sector:'manufactura',  hasDesOrig:true},
+  {scian:'313',   name:'Insumos textiles y acabado de textiles',             sector:'manufactura',  hasDesOrig:true},
+  {scian:'314',   name:'Productos textiles excepto prendas de vestir',       sector:'manufactura',  hasDesOrig:true},
+  {scian:'315',   name:'Fabricacion de prendas de vestir',                   sector:'manufactura',  hasDesOrig:true},
+  {scian:'316',   name:'Curtido y acabado de cuero y piel',                  sector:'manufactura',  hasDesOrig:true},
+  {scian:'321',   name:'Industria de la madera',                             sector:'manufactura',  hasDesOrig:true},
+  {scian:'322',   name:'Industria del papel',                                sector:'manufactura',  hasDesOrig:true},
+  {scian:'323',   name:'Impresion e industrias conexas',                     sector:'manufactura',  hasDesOrig:true},
+  {scian:'324',   name:'Productos derivados del petroleo y carbon',          sector:'manufactura',  hasDesOrig:true},
+  {scian:'325',   name:'Industria quimica',                                  sector:'manufactura',  hasDesOrig:true},
+  {scian:'326',   name:'Industria del plastico y del hule',                  sector:'manufactura',  hasDesOrig:true},
+  {scian:'327',   name:'Fabricacion de productos de minerales no metalicos', sector:'manufactura',  hasDesOrig:true},
+  {scian:'331',   name:'Industrias metalicas basicas',                       sector:'manufactura',  hasDesOrig:true},
+  {scian:'332',   name:'Fabricacion de productos metalicos',                 sector:'manufactura',  hasDesOrig:true},
+  {scian:'333',   name:'Fabricacion de maquinaria y equipo',                 sector:'manufactura',  hasDesOrig:true},
+  {scian:'334',   name:'Fabricacion de equipo de computo y comunicacion',    sector:'manufactura',  hasDesOrig:true},
+  {scian:'335',   name:'Fabricacion de accesorios y aparatos electricos',    sector:'manufactura',  hasDesOrig:true},
+  {scian:'336',   name:'Fabricacion de equipo de transporte',                sector:'manufactura',  hasDesOrig:true},
+  {scian:'337',   name:'Fabricacion de muebles, colchones y persianas',      sector:'manufactura',  hasDesOrig:true},
+  {scian:'339',   name:'Otras industrias manufactureras',                    sector:'manufactura',  hasDesOrig:true},
+];
+
+const SECTOR_COLORS = {total:'#002060',mineria:'#9B7D3A',energia:'#007B5E',construccion:'#C0001D',manufactura:'#002060'};
+const SECTOR_LABELS = {total:'Actividad Industrial Total',mineria:'Mineria',energia:'Energia electrica, agua y gas',construccion:'Construccion',manufactura:'Industrias Manufactureras'};
+const CONTRIB_COLORS = ['#1A56C4','#C0001D','#007B5E','#9B7D3A','#6B4C9A','#D35400','#16A085','#8E44AD','#2C3E50','#E74C3C','#27AE60','#F39C12','#3498DB','#E91E63','#00BCD4'];
+
+// ══════════════════════════════════════════════════════════════════════════════
+// STATE VARIABLES
+// ══════════════════════════════════════════════════════════════════════════════
+let fromIdx=0,toIdx=0;
+let allCharts=[],modalCharts=[];
+let currentFreq='M',currentView='graficas',currentMode='variaciones';
+let graficasScaleMode='auto';
+let msgChart=null,msgSeriesScian='IMAI',msgShowOrg=false,msgShowDes=true,msgShowTend=true,msgFromIdx=0,msgToIdx=0;
+let contribChart=null,contribMainIndicator='IMAI',contribSelectedComponents=['21','22','23','31-33'],contribScaleMode='auto',lastContribData=null;
+let contribSerieType='org'; // 'org' | 'des'
+let contribVarType='A';     // 'A' | 'M' | 'P'
+let contribBasePeriod=null; // periodo base para modo Personalizada
+let rebaseType='A',rebaseBase=null;
+
+// ══════════════════════════════════════════════════════════════════════════════
+// DATA LOADING — uses row 5 numeric SCIAN identifiers (not header text)
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Single canonical date parser — handles ALL formats SheetJS may produce:
+ *   - string  "1993/01"  (ORG/DES/TEND cells stored as text)
+ *   - string  "1993-01..." (alternative text format)
+ *   - Date    JS Date object (cellDates:true, from Estructura sheets)
+ *   - number  Excel serial  (fallback)
+ * Always returns "YYYY/MM" or null.
+ * NOTE: Date objects from SheetJS use LOCAL time (not UTC) for Excel dates.
+ */
+function parsePeriod(pRaw){
+  if(pRaw==null||pRaw==='')return null;
+  if(typeof pRaw==='string'){
+    if(/^\d{4}\/\d{2}/.test(pRaw))return pRaw.slice(0,7);
+    if(/^\d{4}-\d{2}/.test(pRaw))return pRaw.slice(0,4)+'/'+pRaw.slice(5,7);
+    return null;
+  }
+  if(pRaw instanceof Date){
+    // Use LOCAL time — SheetJS creates Excel dates as local midnight
+    return pRaw.getFullYear()+'/'+String(pRaw.getMonth()+1).padStart(2,'0');
+  }
+  if(typeof pRaw==='number'){
+    try{
+      const dt=XLSX.SSF.parse_date_code(pRaw);
+      if(dt&&dt.y)return dt.y+'/'+String(dt.m).padStart(2,'0');
+    }catch(e){}
+    // Manual fallback: Excel epoch = 1899-12-30 UTC
+    const d=new Date(Math.round((pRaw-25569)*86400*1000));
+    return d.getUTCFullYear()+'/'+String(d.getUTCMonth()+1).padStart(2,'0');
+  }
+  return null;
+}
+
+/** Map row-5 numeric ID → canonical SCIAN string */
+function mapScianId(id){
+  if(id===1||id==='1')return'IMAI';
+  if(id===31||id==='31')return'31-33';
+  if(id==null)return null;
+  const s=String(id).trim();
+  return s||null;
+}
+
+async function loadExcelAndInit(){
+  try{
+    const resp=await fetch('IQYs/Data.xlsx?v='+Date.now(),{cache:'no-store'});
+    if(!resp.ok)throw new Error('HTTP '+resp.status);
+    const buf=await resp.arrayBuffer();
+    // cellDates:true → Estructura date cells become JS Date objects
+    const wb=XLSX.read(buf,{type:'array',cellDates:true});
+
+    /**
+     * Parse ORG/DES/TEND sheets.
+     * These have 4 content rows (INEGI header etc.) before the SCIAN ID row,
+     * so SheetJS array indices are fixed: scianRow=4, dataStart=6.
+     * Date column is stored as TEXT "1993/01" → parsePeriod handles it.
+     */
+    function parseSheetByScian(sheetName){
+      const ws=wb.Sheets[sheetName];
+      if(!ws)return null;
+      const data=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true});
+      if(data.length<7)return null;
+
+      const idRow=data[4]; // SCIAN IDs at JS index 4 (fila 5) in old BIE format
+      const scianToCol={};
+      const hasScianRow=idRow&&idRow.slice(2).some(v=>v!=null&&!isNaN(+String(v).trim())&&String(v).trim()!=='');
+      if(hasScianRow){
+        for(let c=2;c<idRow.length;c++){
+          const scian=mapScianId(idRow[c]);
+          if(scian)scianToCol[scian]=c;
+        }
+      }else{
+        // Newer BIE exports omit the SCIAN ID row; use hardcoded column order
+        const FB={
+          'ORG': ['IMAI','21','211','212','213','22','221','23','236','237','238','31-33','311','312','313','314','315','316','321','322','323','324','325','326','327','331','332','333','334','335','336','337','339'],
+          'DES': ['IMAI','21','211','212','213','22','23','236','237','238','31-33','311','312','313','314','315','316','321','322','323','324','325','326','327','331','332','333','334','335','336','337','339'],
+          'TEND':['IMAI','21','211','212','213','22','23','236','237','238','31-33','311','312','313','314','315','316','321','322','323','324','325','326','327','331','332','333','334','335','336','337','339']
+        };
+        (FB[sheetName]||FB['DES']).forEach((s,i)=>{scianToCol[s]=i+2;});
+      }
+
+      // Find first data row dynamically when SCIAN row may be absent
+      let dataStart=6;
+      if(!hasScianRow){
+        for(let r=4;r<Math.min(12,data.length);r++){
+          if(data[r]&&parsePeriod(data[r][0])!==null){dataStart=r;break;}
+        }
+      }
+
+      const periods=[],colByScian={};
+      Object.keys(scianToCol).forEach(s=>{colByScian[s]=[];});
+
+      for(let r=dataStart;r<data.length;r++){
+        const row=data[r];
+        const period=parsePeriod(row[0]);
+        if(!period)continue;
+        periods.push(period);
+        Object.entries(scianToCol).forEach(([scian,col])=>{
+          const v=row[col];
+          colByScian[scian].push((v!=null&&v!==''&&typeof v!=='boolean')?+v:null);
+        });
+      }
+      console.log(sheetName+': '+periods.length+' periods | '+periods[0]+' → '+periods[periods.length-1]);
+      return{periods,colByScian};
+    }
+
+    const org=parseSheetByScian('ORG');
+    const des=parseSheetByScian('DES');
+    const tend=parseSheetByScian('TEND');
+    if(!org)throw new Error('No se pudo leer la hoja ORG');
+
+    RAW={periods:org.periods,series:{}};
+    SERIES_DEFS.forEach(def=>{
+      const scian=def.scian;
+      RAW.series[scian]={
+        name:def.name,scian,sector:def.sector,
+        org:org.colByScian[scian]||org.periods.map(()=>null),
+        des:(des&&des.colByScian[scian]&&des.colByScian[scian].some(v=>v!=null))?des.colByScian[scian]:null,
+        tend:(tend&&tend.colByScian[scian]&&tend.colByScian[scian].some(v=>v!=null))?tend.colByScian[scian]:null
+      };
+    });
+
+    parseEstructura(wb);
+    parsePIB18(wb);
+
+    // ── Alignment check ─────────────────────────────────────────────────────
+    ['ESTRUCTURA','ESTRUCTURA_D'].forEach(name=>{
+      const est=name==='ESTRUCTURA'?ESTRUCTURA:ESTRUCTURA_D;
+      if(!est||!est.periods.length){console.warn(name+': EMPTY — synthetic weights will be used');return;}
+      const last=est.periods[est.periods.length-1];
+      const rawLast=RAW.periods[RAW.periods.length-1];
+      const ok=last===rawLast;
+      console.log(name+': '+est.periods.length+' periods | '+est.periods[0]+' → '+last+' | align='+(ok?'✓':'✗ MISMATCH with RAW '+rawLast));
+    });
+
+    document.getElementById('loadingOverlay').style.display='none';
+    initDashboard();
+  }catch(e){
+    document.getElementById('loadingOverlay').innerHTML='<div style="color:#AE001C;font-size:14px">Error cargando datos: '+e.message+'</div>';
+    console.error(e);
+  }
+}
+
+/**
+ * Parse a structure sheet (Estructura_O or Estructura_D).
+ * These sheets have 4 BLANK rows before the SCIAN ID row — SheetJS skips blank
+ * rows, so JS array indices differ from ORG/DES/TEND.
+ * We detect the SCIAN ID row dynamically: it's the first row that contains the
+ * value 1 (IMAI identifier) in any column from index 2 onward.
+ * Data starts 2 rows after the SCIAN ID row (SCIAN row → header row → data).
+ */
+function parseEstructuraSheet(wb,sheetName){
+  const ws=wb.Sheets[sheetName];
+  if(!ws)return null;
+  const data=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true});
+  if(data.length<3)return null;
+
+  // Find SCIAN ID row: contains IMAI (value 1 or '1') and no parseable period in col 0
+  let scianRowIdx=-1;
+  for(let i=0;i<Math.min(12,data.length);i++){
+    const row=data[i];
+    if(!row)continue;
+    if(row.some(v=>v===1||v==='1')&&parsePeriod(row[0])===null){scianRowIdx=i;break;}
+  }
+  const scianToCol={};
+  let dataStart;
+  if(scianRowIdx>=0){
+    const idRow=data[scianRowIdx];
+    // New BIE format: codes start at col 0, data offset by +2 (period+area before values)
+    // Old format: codes start at col 2, no offset needed
+    const colOffset=mapScianId(idRow[0])!==null?2:0;
+    for(let c=0;c<idRow.length;c++){
+      const scian=mapScianId(idRow[c]);
+      if(scian)scianToCol[scian]=c+colOffset;
+    }
+    dataStart=scianRowIdx+2; // skip SCIAN row + header row
+  }else{
+    // Fallback: hardcoded column order per sheet type
+    const FB_O=['IMAI','21','211','212','213','22','221','23','236','237','238','31-33','311','312','313','314','315','316','321','322','323','324','325','326','327','331','332','333','334','335','336','337','339'];
+    const FB_D=['IMAI','21','211','212','213','22','23','236','237','238','31-33','311','312','313','314','315','316','321','322','323','324','325','326','327','331','332','333','334','335','336','337','339'];
+    const FB=sheetName==='Estructura_D'?FB_D:FB_O;
+    FB.forEach((s,i)=>{scianToCol[s]=i+2;});
+    dataStart=1;
+    for(let r=0;r<Math.min(8,data.length);r++){
+      if(data[r]&&parsePeriod(data[r][0])!==null){dataStart=r;break;}
+    }
+  }
+
+  const result={periods:[],data:{}};
+  Object.keys(scianToCol).forEach(s=>{result.data[s]=[];});
+
+  for(let r=dataStart;r<data.length;r++){
+    const row=data[r];
+    const period=parsePeriod(row[0]);
+    if(!period)continue;
+    result.periods.push(period);
+    Object.entries(scianToCol).forEach(([scian,col])=>{
+      const v=row[col];
+      let numVal=null;
+      if(v!=null&&v!==''&&typeof v!=='boolean'){
+        const parsed=typeof v==='number'?v:parseFloat(String(v).replace(/,/g,''));
+        if(!isNaN(parsed))numVal=parsed;
+      }
+      result.data[scian].push(numVal);
+    });
+  }
+  console.log(sheetName+': scianRow='+scianRowIdx+' | '+result.periods.length+' periods | '+result.periods[0]+' → '+result.periods[result.periods.length-1]);
+  return result;
+}
+
+function parsePIB18(wb){
+  const ws=wb.Sheets['PIB18'];
+  if(!ws)return;
+  const data=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true});
+  // Row index 2 has: col 0 = 2018 (year label), col 1+ = weights in same SCIAN order as Estructura_O
+  const weightRow=data[2];
+  if(!weightRow)return;
+  // Get SCIAN IDs from Estructura_O header row (col offset: Estructura_O col c → PIB18 col c-1)
+  const estWs=wb.Sheets['Estructura_O']||wb.Sheets['Estructura'];
+  if(!estWs)return;
+  const estData=XLSX.utils.sheet_to_json(estWs,{header:1,defval:null,raw:true});
+  let scianRowIdx=-1;
+  for(let i=0;i<Math.min(12,estData.length);i++){
+    const row=estData[i];
+    if(!row)continue;
+    if(row.some(v=>v===1||v==='1')&&parsePeriod(row[0])===null){scianRowIdx=i;break;}
+  }
+  if(scianRowIdx<0)return;
+  const scianRow=estData[scianRowIdx];
+  const colOffset=mapScianId(scianRow[0])!==null?2:0;
+  PIB18={};
+  for(let c=0;c<scianRow.length;c++){
+    const scian=mapScianId(scianRow[c]);
+    if(!scian)continue;
+    // PIB18 col = Estructura_O data col - 1 = (c + colOffset) - 1
+    const w=weightRow[(c+colOffset)-1];
+    if(w!=null&&typeof w==='number'&&w>0)PIB18[scian]=w;
+  }
+}
+
+function parseEstructura(wb){
+  // Primary: Estructura_O (original), fallback: Estructura (legacy)
+  let res=parseEstructuraSheet(wb,'Estructura_O')||parseEstructuraSheet(wb,'Estructura');
+  if(res){
+    ESTRUCTURA=res;
+  }else{
+    createSyntheticEstructura();
+  }
+
+  // Desestacionalizada structure
+  let resD=parseEstructuraSheet(wb,'Estructura_D');
+  if(resD){
+    ESTRUCTURA_D=resD;
+  }else{
+    // Fallback: use original structure for D
+    ESTRUCTURA_D=ESTRUCTURA;
+  }
+}
+
+function createSyntheticEstructura(){
+  const weights={'IMAI':100,'21':15,'211':8,'212':5,'213':2,'22':5,'221':5,'23':12,'236':5,'237':4,'238':3,'31-33':68,'311':8,'312':4,'313':1,'314':0.5,'315':1.5,'316':1,'321':0.5,'322':1.5,'323':0.5,'324':4,'325':6,'326':3,'327':2,'331':4,'332':3,'333':4,'334':6,'335':3,'336':12,'337':1,'339':1.5};
+  ESTRUCTURA={periods:RAW.periods.slice(),data:{}};
+  Object.keys(weights).forEach(scian=>{ESTRUCTURA.data[scian]=RAW.periods.map(()=>weights[scian]);});
+  // Also set D structure (without 221)
+  const weightsD=Object.assign({},weights);
+  delete weightsD['221'];
+  ESTRUCTURA_D={periods:RAW.periods.slice(),data:{}};
+  Object.keys(weightsD).forEach(scian=>{ESTRUCTURA_D.data[scian]=RAW.periods.map(()=>weightsD[scian]);});
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// UTILITY FUNCTIONS
+// ══════════════════════════════════════════════════════════════════════════════
+const fmt=v=>(v!=null&&isFinite(v))?v.toFixed(1):'N/D';
+const fmtP=v=>(v!=null&&isFinite(v))?((v>=0?'+':'')+v.toFixed(1)+'%'):'N/D';
+const chgCls=v=>v==null?'neu':v>0.05?'pos':v<-0.05?'neg':'neu';
+
+function getSeries(scian){return RAW.series[scian]||null;}
+function getSeriesForSector(sector){return SERIES_DEFS.filter(d=>d.sector===sector).map(d=>RAW.series[d.scian]).filter(s=>s);}
+function getLastValid(arr){if(!arr)return{val:null,idx:-1};for(let i=arr.length-1;i>=0;i--)if(arr[i]!=null)return{val:arr[i],idx:i};return{val:null,idx:-1};}
+function calcVarAnualM(arr,idx){if(!arr)return null;return(idx>=12&&arr[idx]!=null&&arr[idx-12]!=null)?((arr[idx]-arr[idx-12])/arr[idx-12])*100:null;}
+function calcVarMensM(arr,idx){if(!arr)return null;return(idx>0&&arr[idx]!=null&&arr[idx-1]!=null)?((arr[idx]-arr[idx-1])/arr[idx-1])*100:null;}
+
+function getVals(s,key){
+  const raw=s[key];
+  if(!raw)return null;
+  if(!rebaseBase)return raw;
+  const f=rebaseBase.factors[s.scian]?.[key];
+  return rebaseArr(raw,f);
+}
+function rebaseArr(arr,factor){
+  if(!arr||!factor)return arr?arr.map(()=>null):null;
+  return arr.map(v=>v!=null?(v/factor)*100:null);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// AGGREGATION
+// ══════════════════════════════════════════════════════════════════════════════
+function aggregate(vals,rawPeriods,freq){
+  if(!vals)return{vals:null,periods:rawPeriods.slice()};
+  if(freq==='M')return{vals:vals.slice(),periods:rawPeriods.slice()};
+  const map={},order=[];
+  rawPeriods.forEach((p,i)=>{
+    const[yr,mo]=p.split('/');
+    const key=freq==='Q'?yr+'/Q'+Math.ceil(+mo/3):yr;
+    if(!map[key]){map[key]=[];order.push(key);}
+    if(vals[i]!==null&&vals[i]!==undefined)map[key].push(vals[i]);
+  });
+  return{vals:order.map(k=>map[k].length?map[k].reduce((a,b)=>a+b)/map[k].length:null),periods:order};
+}
+
+function varAnualArrWithLookback(vals,periods,fullVals,fullPeriods,freq){
+  if(!vals||!fullVals)return vals?vals.map(()=>null):null;
+  const lag=freq==='A'?1:freq==='Q'?4:12;
+  return vals.map((_,i)=>{
+    const currP=periods[i];
+    const currV=vals[i];
+    const fullIdx=fullPeriods.indexOf(currP);
+    const prevV=fullIdx>=lag?fullVals[fullIdx-lag]:null;
+    return(currV!=null&&prevV!=null)?((currV-prevV)/prevV)*100:null;
+  });
+}
+
+function varPeriodArrWithLookback(vals,periods,fullVals,fullPeriods){
+  if(!vals||!fullVals)return vals?vals.map(()=>null):null;
+  return vals.map((_,i)=>{
+    const currP=periods[i];
+    const currV=vals[i];
+    let prevV=null;
+    if(i>0)prevV=vals[i-1];
+    else{const fullIdx=fullPeriods.indexOf(currP);if(fullIdx>0)prevV=fullVals[fullIdx-1];}
+    return(currV!=null&&prevV!=null)?((currV-prevV)/prevV)*100:null;
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// HISTORICAL STATS - FIXED: Exact month calculation
+// ══════════════════════════════════════════════════════════════════════════════
+function getHistStats(arr,lastIdx){
+  if(!arr)return null;
+  const cur=arr[lastIdx];
+  if(cur==null)return null;
+  
+  const validVals=arr.slice(0,lastIdx+1).filter(v=>v!=null);
+  if(!validVals.length)return null;
+
+  const maxV=Math.max(...validVals);
+  const minV=Math.min(...validVals);
+  const TOL=Math.abs(cur)*0.0005;
+
+  const isMax=cur>=maxV-TOL;
+  const isMin=cur<=minV+TOL;
+
+  // Find EXACT months since higher/lower value
+  let monthsAbove=0;
+  for(let i=lastIdx-1;i>=0;i--){
+    if(arr[i]==null)continue;
+    if(arr[i]>cur+TOL){monthsAbove=lastIdx-i;break;}
+  }
+
+  let monthsBelow=0;
+  for(let i=lastIdx-1;i>=0;i--){
+    if(arr[i]==null)continue;
+    if(arr[i]<cur-TOL){monthsBelow=lastIdx-i;break;}
+  }
+
+  let maxIdx=lastIdx,minIdx=lastIdx;
+  for(let i=0;i<=lastIdx;i++){
+    if(arr[i]!=null){
+      if(arr[i]>=(arr[maxIdx]??-Infinity))maxIdx=i;
+      if(arr[i]<=(arr[minIdx]??Infinity))minIdx=i;
+    }
+  }
+
+  let varM=0;
+  if(lastIdx>=1&&arr[lastIdx-1]!=null)varM=cur-arr[lastIdx-1];
+  
+  return{maxV,minV,maxP:RAW.periods[maxIdx]||'',minP:RAW.periods[minIdx]||'',monthsAbove,monthsBelow,pctMax:((cur-maxV)/maxV)*100,isMax,isMin,varM};
+}
+
+function fmtCtx(st){
+  if(!st)return{text:'—',cls:''};
+  if(st.isMax)return{text:'Maximo historico',cls:'highlight'};
+  if(st.isMin)return{text:'Minimo historico',cls:'lowlight'};
+  if(st.varM>=0&&st.monthsAbove>0)return{text:'Maximo en '+st.monthsAbove+' '+(st.monthsAbove===1?'mes':'meses'),cls:'highlight'};
+  if(st.varM<0&&st.monthsBelow>0)return{text:'Minimo en '+st.monthsBelow+' '+(st.monthsBelow===1?'mes':'meses'),cls:'lowlight'};
+  return{text:st.pctMax.toFixed(1)+'% del maximo',cls:''};
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SIGNAL ENGINE - FIXED: Dynamic messages, exact consecutive months
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Count consecutive positive or negative monthly variations
+function countConsecutiveMonths(arr,upToIdx,positive){
+  let count=0;
+  for(let i=upToIdx;i>=1;i--){
+    const v=calcVarMensM(arr,i);
+    if(v==null)continue;
+    if(positive&&v>0)count++;
+    else if(!positive&&v<0)count++;
+    else break;
+  }
+  return count;
+}
+
+// Get last N monthly variations
+function getLastNVariations(arr,upToIdx,n){
+  const result=[];
+  for(let i=upToIdx;i>=1&&result.length<n;i--){
+    const v=calcVarMensM(arr,i);
+    if(v!=null)result.unshift({idx:i,val:v});
+  }
+  return result;
+}
+
+function getSignal(des,upToIdx){
+  if(!des)return{label:'Sin datos desest.',color:'#888',sub:'serie no disponible'};
+  
+  const variations=[];
+  for(let i=Math.max(1,upToIdx-8);i<=upToIdx;i++){
+    const v=calcVarMensM(des,i);
+    if(v!=null)variations.push({idx:i,val:v});
+  }
+  
+  if(variations.length<3)return{label:'--',color:'#888',sub:'datos insuficientes'};
+
+  const pos=v=>v>0;
+  const neg=v=>v<0;
+
+  const last6=variations.slice(-6);
+  const last3=variations.slice(-3);
+  const m0=last3[2]?.val,m1=last3[1]?.val,m2=last3[0]?.val;
+  
+  if(m0==null||m1==null||m2==null)return{label:'--',color:'#888',sub:'datos insuficientes'};
+
+  const a3=last3.reduce((s,v)=>s+v.val,0)/last3.length;
+  const a6=last6.length>=3?last6.reduce((s,v)=>s+v.val,0)/last6.length:a3;
+  
+  // Count consecutive months dynamically
+  const consecPos=countConsecutiveMonths(des,upToIdx,true);
+  const consecNeg=countConsecutiveMonths(des,upToIdx,false);
+  
+  // Sustained expansion/contraction (6+ months)
+  if(last6.length===6&&last6.every(v=>pos(v.val)))
+    return{label:'Expansion sostenida',color:'#145C38',sub:consecPos+' meses al alza'};
+  if(last6.length===6&&last6.every(v=>neg(v.val)))
+    return{label:'Contraccion sostenida',color:'#C0001D',sub:consecNeg+' meses a la baja'};
+  
+  // Dynamic positive streak (3+ months)
+  if(pos(m0)&&pos(m1)&&pos(m2))
+    return{label:'Dinamica positiva',color:'#2E7D32',sub:consecPos+' meses consecutivos al alza'};
+  
+  // Dynamic negative streak
+  if(neg(m0)&&neg(m1)&&neg(m2))
+    return{label:'Dinamica negativa',color:'#C0001D',sub:consecNeg+' meses consecutivos a la baja'};
+  
+  // Reversal signals
+  if(a6<0&&pos(m0)&&pos(m1))
+    return{label:'Recuperacion',color:'#558B2F',sub:'rebote tras contraccion'};
+  if(a6>0&&neg(m0)&&neg(m1))
+    return{label:'Caida',color:'#D32F2F',sub:'caida tras periodo de alza'};
+
+  const p3=last3.filter(v=>pos(v.val)).length;
+  const n3=last3.filter(v=>neg(v.val)).length;
+
+  if(p3===2&&neg(m0))return{label:'Quiebre a la baja',color:'#D32F2F',sub:'ultimo mes negativo'};
+  if(n3===2&&pos(m0))return{label:'Mejora incipiente',color:'#388E3C',sub:'ultimo mes positivo'};
+  if(Math.abs(a3)<=0.15)return{label:'Atonia',color:'#78909C',sub:'sin tendencia clara'};
+  
+  // Mixed - FIXED: Show last 3 exact variations
+  const lastThree=getLastNVariations(des,upToIdx,3);
+  const varStrs=lastThree.map((v,i)=>'m'+(i+1)+': '+(v.val>=0?'+':'')+v.val.toFixed(2)+'%');
+  return{label:'Variacion mixta',color:'#546E7A',sub:varStrs.join(' | ')};
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CHART OPTIONS
+// ══════════════════════════════════════════════════════════════════════════════
+function ceilNice(v,step){return Math.ceil(v/step)*step;}
+function floorNice(v,step){return Math.floor(v/step)*step;}
+function niceStep(range){
+  const raw=range/4;
+  const mag=Math.pow(10,Math.floor(Math.log10(Math.abs(raw)||1)));
+  const norm=raw/mag;
+  const step=norm<=1?1:norm<=2?2:norm<=5?5:10;
+  return step*mag;
+}
+
+function clipLimits(values,pLo=0.03,pHi=0.97,forceZero=false){
+  const v=values.filter(x=>x!=null&&isFinite(x)).sort((a,b)=>a-b);
+  if(!v.length)return{min:undefined,max:undefined,clipped:false};
+  const lo=v[Math.floor(pLo*(v.length-1))];
+  const hi=v[Math.floor(pHi*(v.length-1))];
+  const roughMin=forceZero?Math.min(lo,0):lo;
+  const roughMax=forceZero?Math.max(hi,0):hi;
+  const step=niceStep(roughMax-roughMin);
+  const clMin=floorNice(roughMin-step*0.2,step);
+  const clMax=ceilNice(roughMax+step*0.2,step);
+  return{min:forceZero?Math.min(clMin,0):clMin,max:forceZero?Math.max(clMax,0):clMax,step,clipped:false};
+}
+
+function fullLimits(values,forceZero=false){
+  const v=values.filter(x=>x!=null&&isFinite(x));
+  if(!v.length)return{min:undefined,max:undefined,step:1};
+  const lo=Math.min(...v),hi=Math.max(...v);
+  const roughMin=forceZero?Math.min(lo,0):lo;
+  const roughMax=forceZero?Math.max(hi,0):hi;
+  const step=niceStep(roughMax-roughMin);
+  return{min:floorNice(roughMin-step*0.1,step),max:ceilNice(roughMax+step*0.1,step),step};
+}
+
+function tightLimits(values){
+  const v=values.filter(x=>x!=null&&isFinite(x));
+  if(!v.length)return{min:undefined,max:undefined,clipped:false};
+  const lo=Math.min(...v),hi=Math.max(...v);
+  const step=niceStep(hi-lo);
+  return{min:floorNice(lo-step*0.15,step),max:ceilNice(hi+step*0.15,step),step,clipped:false};
+}
+
+const truncPlugin={
+  id:'truncLines',
+  afterDraw(chart){
+    const ys=chart.scales.y;
+    if(!ys)return;
+    const{min:yMin,max:yMax}=ys;
+    const ds=chart.data.datasets[0];
+    if(!ds)return;
+    const allVals=ds.data.filter(v=>v!=null&&isFinite(v));
+    if(!allVals.length)return;
+    const rawMin=Math.min(...allVals),rawMax=Math.max(...allVals);
+    const{ctx,chartArea:{left,right,top,bottom}}=chart;
+    ctx.save();
+    ctx.strokeStyle='#999999';ctx.lineWidth=1.2;ctx.setLineDash([4,3]);
+    if(rawMax>yMax+0.01){ctx.beginPath();ctx.moveTo(left,top+1);ctx.lineTo(right,top+1);ctx.stroke();}
+    if(rawMin<yMin-0.01){ctx.beginPath();ctx.moveTo(left,bottom-1);ctx.lineTo(right,bottom-1);ctx.stroke();}
+    ctx.restore();
+  }
+};
+Chart.register(truncPlugin);
+
+function xTickCb(freq,small){
+  return function(v){
+    const l=this.getLabelForValue(v);
+    if(!l)return'';
+    const parts=l.split('/');
+    if(parts.length<2)return l;
+    const[yr,rest]=parts;
+    if(rest.startsWith('Q'))return small?(rest==='Q1'?yr:''):yr+'-'+rest;
+    const mo=rest;
+    if(!small)return yr+'-'+mo;
+    return(mo==='01'||mo==='07')?yr.slice(2)+'-'+mo:'';
+  };
+}
+
+function barOpts(vals,isPct,small=true){
+  const lim=(graficasScaleMode==='full')?fullLimits(vals,true):clipLimits(vals,0.03,0.97,true);
+  const fs=small?7:10;
+  return{responsive:true,animation:false,plugins:{legend:{display:false},truncLines:{},tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>ctx.parsed.y!=null?ctx.parsed.y.toFixed(2)+(isPct?'%':''):''}}},scales:{x:{display:true,grid:{display:false},ticks:{maxTicksLimit:small?8:16,font:{family:'IBM Plex Mono',size:fs},color:'#AAAAAA',maxRotation:90,minRotation:45,autoSkip:true,callback:xTickCb(currentFreq,small)},border:{display:false}},y:{display:true,min:lim.min,max:lim.max,grid:{color:ctx=>ctx.tick.value===0?'#33333380':'#E4E4E0',lineWidth:ctx=>ctx.tick.value===0?1.5:0.5},ticks:{stepSize:lim.step,font:{family:'IBM Plex Mono',size:fs},color:'#AAAAAA',callback:v=>{const d=v>=10||v<=-10?0:v>=1||v<=-1?1:2;return v.toFixed(d)+(isPct?'%':'');}},border:{display:false}}}};
+}
+
+function lineOpts(vals,small=true){
+  const lim=(graficasScaleMode==='full')?fullLimits(vals,false):tightLimits(vals);
+  const fs=small?7:10;
+  return{responsive:true,animation:false,plugins:{legend:{display:false},truncLines:{},tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>ctx.parsed.y!=null?ctx.parsed.y.toFixed(1):''}}},scales:{x:{display:true,grid:{display:false},ticks:{maxTicksLimit:small?8:16,font:{family:'IBM Plex Mono',size:fs},color:'#AAAAAA',maxRotation:90,minRotation:45,autoSkip:true,callback:xTickCb(currentFreq,small)},border:{display:false}},y:{display:true,min:lim.min,max:lim.max,grid:{color:'#E4E4E0',lineWidth:0.5},ticks:{stepSize:lim.step,font:{family:'IBM Plex Mono',size:fs},color:'#AAAAAA',callback:v=>{const d=v>=10||v<=-10?0:v>=1||v<=-1?1:2;return v.toFixed(d);}},border:{display:false}}}};
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CONTROLS
+// ══════════════════════════════════════════════════════════════════════════════
+const selFrom=document.getElementById('selFrom'),selTo=document.getElementById('selTo');
+selFrom.addEventListener('change',()=>{fromIdx=+selFrom.value;redrawAll();});
+selTo.addEventListener('change',()=>{toIdx=+selTo.value;redrawAll();});
+
+function setFreq(f,btn){document.querySelectorAll('[data-grp="freq"]').forEach(b=>b.classList.remove('active'));btn.classList.add('active');currentFreq=f;redrawAll();}
+function setView(v,btn){document.querySelectorAll('[data-grp="view"]').forEach(b=>b.classList.remove('active'));btn.classList.add('active');currentView=v;const scaleCg=document.getElementById('graficasScaleCg');if(scaleCg)scaleCg.style.display=(v==='graficas')?'flex':'none';const freqGrp=document.getElementById('freqChipGroup');if(freqGrp)freqGrp.classList.toggle('freq-disabled',v==='mensajes'||v==='contribuciones');redrawAll();}
+function setMode(m,btn){document.querySelectorAll('[data-grp="mode"]').forEach(b=>b.classList.remove('active'));btn.classList.add('active');currentMode=m;redrawAll();}
+function setGraficasScale(mode,btn){graficasScaleMode=mode;document.querySelectorAll('#gScaleAuto,#gScaleFull').forEach(b=>b.classList.remove('active'));btn.classList.add('active');redrawAll();}
+function updateInfo(){document.getElementById('rangeInfo').textContent=RAW.periods[fromIdx].replace('/','-')+' → '+RAW.periods[toIdx].replace('/','-')+' | '+(toIdx-fromIdx+1)+' obs.';}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MODAL
+// ══════════════════════════════════════════════════════════════════════════════
+function openModal(scian,color){
+  const s=getSeries(scian);
+  if(!s)return;
+  modalCharts.forEach(c=>c.destroy());
+  modalCharts=[];
+  document.getElementById('modalTitle').textContent=s.name;
+  document.getElementById('modalMeta').textContent='SCIAN '+s.scian+'  |  Base 2018=100';
+
+  const fullOrg=getVals(s,'org');
+  const fullDes=getVals(s,'des');
+  const fullTend=getVals(s,'tend');
+  const fullPeriods=RAW.periods;
+  
+  const{vals:fullOrgAgg,periods:fullOrgPeriods}=aggregate(fullOrg,fullPeriods,currentFreq);
+  const{vals:fullDesAgg,periods:fullDesPeriods}=aggregate(fullDes,fullPeriods,currentFreq);
+  const{vals:fullTendAgg}=aggregate(fullTend,fullPeriods,currentFreq);
+
+  const slP=RAW.periods.slice(fromIdx,toIdx+1);
+  const{vals:oV,periods:oP}=aggregate(fullOrg?fullOrg.slice(fromIdx,toIdx+1):null,slP,currentFreq);
+  const{vals:dV,periods:dP}=aggregate(fullDes?fullDes.slice(fromIdx,toIdx+1):null,slP,currentFreq);
+  const{vals:tV,periods:tP}=aggregate(fullTend?fullTend.slice(fromIdx,toIdx+1):null,slP,currentFreq);
+
+  let bodyHtml='';
+  if(currentMode==='variaciones'){
+    const va=varAnualArrWithLookback(oV,oP,fullOrgAgg,fullOrgPeriods,currentFreq);
+    const vd=fullDesAgg?varPeriodArrWithLookback(dV,dP,fullDesAgg,fullDesPeriods):null;
+    const periodLabel=currentFreq==='M'?'Mensual':currentFreq==='Q'?'Trimestral':'Anual';
+    
+    bodyHtml=`<div class="modal-charts"><div class="modal-chart-cell"><div class="modal-chart-label">Var. Anual Original (%)</div><canvas id="mc_1" height="240"></canvas></div><div class="modal-chart-cell"><div class="modal-chart-label">${vd?'Var. '+periodLabel+' Desest. (%)':'No disponible'}</div><canvas id="mc_2" height="240"></canvas></div><div class="modal-chart-cell"><div class="modal-chart-label">${fullTend?'Tendencia-Ciclo':'No disponible'}</div><canvas id="mc_3" height="240"></canvas></div></div>`;
+    document.getElementById('modalBody').innerHTML=bodyHtml;
+    
+    requestAnimationFrame(()=>{
+      if(va)modalCharts.push(new Chart(document.getElementById('mc_1'),{type:'bar',data:{labels:oP,datasets:[{data:va,backgroundColor:va.map(v=>v==null?'transparent':v>=0?'#1A56C440':'#4B8BDE40'),borderColor:va.map(v=>v==null?'transparent':v>=0?'#1A56C4':'#4B8BDE'),borderWidth:1,barPercentage:0.9,categoryPercentage:0.9}]},options:barOpts(va,true,false)}));
+      if(vd)modalCharts.push(new Chart(document.getElementById('mc_2'),{type:'bar',data:{labels:dP,datasets:[{data:vd,backgroundColor:vd.map(v=>v==null?'transparent':v>=0?'#C0001D40':'#FF5A5A40'),borderColor:vd.map(v=>v==null?'transparent':v>=0?'#C0001D':'#FF5A5A'),borderWidth:1,barPercentage:0.9,categoryPercentage:0.9}]},options:barOpts(vd,true,false)}));
+      if(tV){const tf=tV.filter(v=>v!=null);if(tf.length)modalCharts.push(new Chart(document.getElementById('mc_3'),{type:'line',data:{labels:tP,datasets:[{data:tV,borderColor:'#007B5E',borderWidth:2,pointRadius:0,tension:0.4,fill:{target:'origin',above:'#007B5E18',below:'#007B5E18'}}]},options:lineOpts(tf,false)}));}
+    });
+  }else{
+    bodyHtml=`<div class="modal-charts"><div class="modal-chart-cell"><div class="modal-chart-label">Original (nivel)</div><canvas id="mc_1" height="240"></canvas></div><div class="modal-chart-cell"><div class="modal-chart-label">${dV?'Desestacionalizada (nivel)':'No disponible'}</div><canvas id="mc_2" height="240"></canvas></div><div class="modal-chart-cell"><div class="modal-chart-label">${tV?'Tendencia-Ciclo (nivel)':'No disponible'}</div><canvas id="mc_3" height="240"></canvas></div></div>`;
+    document.getElementById('modalBody').innerHTML=bodyHtml;
+    requestAnimationFrame(()=>{
+      if(oV){const of=oV.filter(v=>v!=null);if(of.length)modalCharts.push(new Chart(document.getElementById('mc_1'),{type:'line',data:{labels:oP,datasets:[{data:oV,borderColor:'#1A56C4',borderWidth:2,pointRadius:0,tension:0.3,fill:{target:'origin',above:'#1A56C418'}}]},options:lineOpts(of,false)}));}
+      if(dV){const df=dV.filter(v=>v!=null);if(df.length)modalCharts.push(new Chart(document.getElementById('mc_2'),{type:'line',data:{labels:dP,datasets:[{data:dV,borderColor:'#C0001D',borderWidth:2,pointRadius:0,tension:0.3,fill:{target:'origin',above:'#C0001D18'}}]},options:lineOpts(df,false)}));}
+      if(tV){const tf=tV.filter(v=>v!=null);if(tf.length)modalCharts.push(new Chart(document.getElementById('mc_3'),{type:'line',data:{labels:tP,datasets:[{data:tV,borderColor:'#007B5E',borderWidth:2,pointRadius:0,tension:0.4,fill:{target:'origin',above:'#007B5E18'}}]},options:lineOpts(tf,false)}));}
+    });
+  }
+  document.getElementById('modalOverlay').classList.add('open');
+}
+function closeModal(e){if(e.target===document.getElementById('modalOverlay'))closeModalBtn();}
+function closeModalBtn(){document.getElementById('modalOverlay').classList.remove('open');modalCharts.forEach(c=>c.destroy());modalCharts=[];}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SUMMARY & SECTORS
+// ══════════════════════════════════════════════════════════════════════════════
+function buildSummary(){
+  const g=document.getElementById('summaryGrid');
+  g.innerHTML='';
+  const top={total:'IMAI',mineria:'21',energia:'22',construccion:'23',manufactura:'31-33'};
+  Object.entries(top).forEach(([sec,scian])=>{
+    const s=getSeries(scian);
+    if(!s)return;
+    const org=getVals(s,'org');
+    const{val,idx}=getLastValid(org);
+    const va=calcVarAnualM(org,idx);
+    const baseLabel=rebaseBase?rebaseBase.label:'2018=100';
+    const c=document.createElement('div');
+    c.className='sum-card';
+    c.style.setProperty('--c',SECTOR_COLORS[sec]);
+    c.innerHTML=`<div class="sum-label">${sec==='total'?'IMAI Total':SECTOR_LABELS[sec]}</div><div class="sum-val">${fmt(val)}</div><div class="sum-period">Base ${baseLabel} | ${idx>=0?RAW.periods[idx].replace('/',' '):''}</div><span class="sum-badge ${chgCls(va)}">${fmtP(va)} a/a</span>`;
+    g.appendChild(c);
+  });
+}
+
+function buildTable(container,seriesInSector){
+  const slP=RAW.periods.slice(fromIdx,toIdx+1);
+  const firstOrg=seriesInSector[0]?.org?.slice(fromIdx,toIdx+1);
+  if(!firstOrg)return;
+  const{periods:aggP}=aggregate(firstOrg,slP,currentFreq);
+  const fullPeriods=RAW.periods;
+
+  const wrap=document.createElement('div');
+  wrap.style.cssText='overflow-x:auto;margin-bottom:20px;width:100%';
+
+  let rows='<table class="data-table"><thead><tr><th>Serie</th>';
+  aggP.forEach(p=>{rows+='<th>'+String(p).replace('/','-')+'</th>';});
+  rows+='</tr></thead><tbody>';
+
+  seriesInSector.forEach(s=>{
+    const fullOrg=getVals(s,'org');
+    const fullDes=getVals(s,'des');
+    const fullTend=getVals(s,'tend');
+    const{vals:fullOrgAgg,periods:fullOrgPeriods}=aggregate(fullOrg,fullPeriods,currentFreq);
+    const{vals:fullDesAgg,periods:fullDesPeriods}=aggregate(fullDes,fullPeriods,currentFreq);
+    const{vals:oV,periods:oP}=aggregate(fullOrg?fullOrg.slice(fromIdx,toIdx+1):null,slP,currentFreq);
+    const{vals:dV,periods:dP}=aggregate(fullDes?fullDes.slice(fromIdx,toIdx+1):null,slP,currentFreq);
+    const{vals:tV}=aggregate(fullTend?fullTend.slice(fromIdx,toIdx+1):null,slP,currentFreq);
+
+    if(currentMode==='niveles'){
+      const series=[['Orig.',oV,'#1A56C4']];
+      if(dV)series.push(['Desest.',dV,'#C0001D']);
+      if(tV)series.push(['Tend.',tV,'#007B5E']);
+      series.forEach(([lbl,arr,col])=>{
+        if(!arr)return;
+        rows+='<tr><td style="color:'+col+';font-weight:500">'+s.name+' <span style="opacity:.5;font-size:9px">['+s.scian+'] '+lbl+'</span></td>';
+        for(let i=0;i<aggP.length;i++){const v=arr[i];rows+='<td>'+(v!=null?v.toFixed(1):'—')+'</td>';}
+        rows+='</tr>';
+      });
+    }else{
+      const va=varAnualArrWithLookback(oV,oP,fullOrgAgg,fullOrgPeriods,currentFreq);
+      const vd=fullDesAgg?varPeriodArrWithLookback(dV,dP,fullDesAgg,fullDesPeriods):null;
+      const pLabel=currentFreq==='M'?'m/m':currentFreq==='Q'?'t/t':'a/a*';
+      const series=[['Var.Anual',va,'#1A56C4']];
+      if(vd)series.push(['Var.'+pLabel,vd,'#C0001D']);
+      series.forEach(([lbl,arr,col])=>{
+        if(!arr)return;
+        rows+='<tr><td style="color:'+col+';font-weight:500">'+s.name+' <span style="opacity:.5;font-size:9px">['+s.scian+'] '+lbl+'</span></td>';
+        const decs=lbl==='Var.Anual'?1:2;for(let i=0;i<aggP.length;i++){const v=arr[i];const cls=v==null?'':v>=0?'pos-cell':'neg-cell';rows+='<td class="'+cls+'">'+(v!=null?v.toFixed(decs)+'%':'—')+'</td>';}
+        rows+='</tr>';
+      });
+    }
+  });
+  rows+='</tbody></table>';
+  wrap.innerHTML=rows;
+  container.appendChild(wrap);
+}
+
+function buildCards(grid,s,color){
+  const fullOrg=getVals(s,'org');
+  const fullDes=getVals(s,'des');
+  const fullTend=getVals(s,'tend');
+  const fullPeriods=RAW.periods;
+  const{vals:fullOrgAgg,periods:fullOrgPeriods}=aggregate(fullOrg,fullPeriods,currentFreq);
+  const{vals:fullDesAgg,periods:fullDesPeriods}=aggregate(fullDes,fullPeriods,currentFreq);
+
+  const slP=RAW.periods.slice(fromIdx,toIdx+1);
+  const{vals:oV,periods:oP}=aggregate(fullOrg?fullOrg.slice(fromIdx,toIdx+1):null,slP,currentFreq);
+  const{vals:dV,periods:dP}=aggregate(fullDes?fullDes.slice(fromIdx,toIdx+1):null,slP,currentFreq);
+  const{vals:tV,periods:tP}=aggregate(fullTend?fullTend.slice(fromIdx,toIdx+1):null,slP,currentFreq);
+
+  const org=getVals(s,'org');
+  const des=getVals(s,'des');
+  const tend=getVals(s,'tend');
+  const{val:lastOrg,idx:loIdx}=getLastValid(org);
+  const{val:lastDes,idx:ldIdx}=getLastValid(des);
+  const{val:lastTend}=getLastValid(tend);
+  const varA=calcVarAnualM(org,loIdx);
+  const varM=des?calcVarMensM(des,ldIdx):null;
+  const sig=des?getSignal(des,ldIdx):{label:'Sin serie desest.',color:'#888',sub:'solo original'};
+  const st=des?getHistStats(des,ldIdx):getHistStats(org,loIdx);
+  const ctx=fmtCtx(st);
+
+  let c1data,c2data,c1label,c2label;
+  if(currentMode==='variaciones'){
+    c1data=varAnualArrWithLookback(oV,oP,fullOrgAgg,fullOrgPeriods,currentFreq);
+    c2data=fullDesAgg?varPeriodArrWithLookback(dV,dP,fullDesAgg,fullDesPeriods):null;
+    c1label='Var. Anual Orig. (%)';
+    c2label=c2data?'Var. '+(currentFreq==='M'?'Mensual':currentFreq==='Q'?'Trimestral':'Anual')+' Des. (%)':'No disponible';
+  }else{
+    c1data=oV;c2data=dV;c1label='Original (nivel)';c2label=dV?'Desestacionalizada':'No disponible';
+  }
+
+  const card=document.createElement('div');
+  card.className='card';
+  card.style.setProperty('--c',color);
+  card.innerHTML=`<div class="card-top"><div class="card-title">${s.name}</div><div class="card-scian">${s.scian}</div></div><div class="card-signal"><div class="signal-dot" style="background:${sig.color}"></div><span class="signal-text" style="color:${sig.color}">${sig.label}</span><span class="signal-sep">—</span><span class="signal-sub">${sig.sub}</span></div><div class="card-metrics"><div class="metric"><div class="m-label">Original | ${RAW.periods[loIdx]?.replace('/','-')||''}</div><div class="m-val">${fmt(lastOrg)}</div><div class="m-chg ${chgCls(varA)}">${fmtP(varA)} a/a</div></div><div class="metric"><div class="m-label">${des?'Desest.':'N/D'} | ${des?RAW.periods[ldIdx]?.replace('/','-'):''}</div><div class="m-val">${des?fmt(lastDes):'N/D'}</div><div class="m-chg ${chgCls(varM)}">${des?fmtP(varM)+' m/m':''}</div></div><div class="metric"><div class="m-label">Tendencia</div><div class="m-val">${tend?fmt(lastTend):'N/D'}</div></div></div><div class="card-statbar"><div class="stat-item"><div class="stat-label">Max. historico ${des?'(desest.)':'(orig.)'}</div><div class="stat-val">${st?st.maxV.toFixed(1)+' | '+st.maxP.replace('/','-'):'—'}</div></div><div class="stat-item"><div class="stat-label">Nivel actual</div><div class="stat-val ${ctx.cls}">${ctx.text}</div></div><div class="stat-item"><div class="stat-label">vs Max. historico</div><div class="stat-val ${st&&st.pctMax<-5?'lowlight':''}">${st?st.pctMax.toFixed(1)+'%':'—'}</div></div></div><div class="charts-row"><div class="chart-cell" onclick="openModal('${s.scian}','${color}')" title="Expandir"><div class="ch-label">${c1label}</div><canvas id="c1_${s.scian}" height="65"></canvas></div><div class="chart-cell" onclick="openModal('${s.scian}','${color}')" title="Expandir"><div class="ch-label">${c2label}</div><canvas id="c2_${s.scian}" height="65"></canvas></div><div class="chart-cell" onclick="openModal('${s.scian}','${color}')" title="Expandir"><div class="ch-label">${tend?'Tendencia-Ciclo':'No disponible'}</div><canvas id="c3_${s.scian}" height="65"></canvas></div></div>`;
+  grid.appendChild(card);
+
+  requestAnimationFrame(()=>{
+    const el1=document.getElementById('c1_'+s.scian);
+    if(el1&&c1data){
+      if(currentMode==='variaciones')allCharts.push(new Chart(el1,{type:'bar',data:{labels:oP,datasets:[{data:c1data,backgroundColor:c1data.map(v=>v==null?'transparent':v>=0?'#1A56C440':'#4B8BDE40'),borderColor:c1data.map(v=>v==null?'transparent':v>=0?'#1A56C4':'#4B8BDE'),borderWidth:0.8,barPercentage:1,categoryPercentage:1}]},options:barOpts(c1data,true)}));
+      else{const f=c1data.filter(v=>v!=null&&isFinite(v));if(f.length)allCharts.push(new Chart(el1,{type:'line',data:{labels:oP,datasets:[{data:c1data,borderColor:'#1A56C4',borderWidth:1.8,pointRadius:0,tension:0.3,fill:{target:'origin',above:'#1A56C418'}}]},options:lineOpts(f)}));}
+    }
+    const el2=document.getElementById('c2_'+s.scian);
+    if(el2&&c2data){
+      if(currentMode==='variaciones')allCharts.push(new Chart(el2,{type:'bar',data:{labels:dP,datasets:[{data:c2data,backgroundColor:c2data.map(v=>v==null?'transparent':v>=0?'#C0001D40':'#FF5A5A40'),borderColor:c2data.map(v=>v==null?'transparent':v>=0?'#C0001D':'#FF5A5A'),borderWidth:0.8,barPercentage:1,categoryPercentage:1}]},options:barOpts(c2data,true)}));
+      else{const f=c2data.filter(v=>v!=null&&isFinite(v));if(f.length)allCharts.push(new Chart(el2,{type:'line',data:{labels:dP,datasets:[{data:c2data,borderColor:'#C0001D',borderWidth:1.8,pointRadius:0,tension:0.3,fill:{target:'origin',above:'#C0001D18'}}]},options:lineOpts(f)}));}
+    }
+    const el3=document.getElementById('c3_'+s.scian);
+    if(el3&&tV){const f=tV.filter(v=>v!=null&&isFinite(v));if(f.length)allCharts.push(new Chart(el3,{type:'line',data:{labels:tP,datasets:[{data:tV,borderColor:'#007B5E',borderWidth:1.8,pointRadius:0,tension:0.4,fill:{target:'origin',above:'#007B5E18'}}]},options:lineOpts(f)}));}
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MENSAJES VIEW
+// ══════════════════════════════════════════════════════════════════════════════
+function buildMensajes(){
+  const container=document.getElementById('sectorsContainer');
+  container.innerHTML='';
+  const wrap=document.createElement('div');
+  wrap.className='msg-container';
+
+  const configPanel=document.createElement('div');
+  configPanel.className='msg-selector';
+  configPanel.innerHTML=`<div class="msg-sel-row"><div class="msg-sel-group wide"><div class="msg-sel-label">Indicador</div><select class="msg-sel-dropdown" id="msgSelector"></select></div><div class="msg-sel-group"><div class="msg-sel-label">Fecha inicial</div><select class="msg-sel-dropdown" id="msgFromSel" style="width:140px"></select></div><div class="msg-sel-group"><div class="msg-sel-label">Fecha final</div><select class="msg-sel-dropdown" id="msgToSel" style="width:140px"></select></div></div><div class="msg-sel-row" style="margin-top:16px"><div class="msg-sel-group"><div class="msg-sel-label">Series a mostrar</div><div class="msg-series-toggles" id="msgSeriesToggle"><button class="msg-toggle-btn" data-series="org" id="btnOrg">Original</button><button class="msg-toggle-btn active-des" data-series="des" id="btnDes">Desestacionalizada</button><button class="msg-toggle-btn active-tend" data-series="tend" id="btnTend">Tendencia</button></div></div></div>`;
+  wrap.appendChild(configPanel);
+
+  const selEl=configPanel.querySelector('#msgSelector');
+  ['total','mineria','energia','construccion','manufactura'].forEach(sector=>{
+    const ser=getSeriesForSector(sector);
+    const optgroup=document.createElement('optgroup');
+    optgroup.label=SECTOR_LABELS[sector];
+    ser.forEach(s=>{const opt=new Option(s.name+' ['+s.scian+']',s.scian);if(s.scian==='IMAI')opt.selected=true;optgroup.appendChild(opt);});
+    selEl.appendChild(optgroup);
+  });
+
+  const msgFromSel=configPanel.querySelector('#msgFromSel');
+  const msgToSel=configPanel.querySelector('#msgToSel');
+  RAW.periods.forEach((p,i)=>{msgFromSel.appendChild(new Option(p.replace('/','-'),i));msgToSel.appendChild(new Option(p.replace('/','-'),i));});
+  msgToIdx=RAW.periods.length-1;
+  msgFromIdx=Math.max(0,msgToIdx-119);
+  msgFromSel.value=msgFromIdx;
+  msgToSel.value=msgToIdx;
+
+  selEl.addEventListener('change',()=>{msgSeriesScian=selEl.value;updateMsgToggles();renderMensajes();});
+  msgFromSel.addEventListener('change',()=>{msgFromIdx=+msgFromSel.value;if(msgFromIdx>msgToIdx){msgToIdx=msgFromIdx;msgToSel.value=msgToIdx;}renderMensajes();});
+  msgToSel.addEventListener('change',()=>{msgToIdx=+msgToSel.value;if(msgToIdx<msgFromIdx){msgFromIdx=msgToIdx;msgFromSel.value=msgFromIdx;}renderMensajes();});
+  configPanel.querySelector('#btnOrg').addEventListener('click',e=>{msgShowOrg=!msgShowOrg;e.target.classList.toggle('active-org',msgShowOrg);renderMensajes();});
+  configPanel.querySelector('#btnDes').addEventListener('click',e=>{const s=getSeries(msgSeriesScian);if(!s?.des)return;msgShowDes=!msgShowDes;e.target.classList.toggle('active-des',msgShowDes);renderMensajes();});
+  configPanel.querySelector('#btnTend').addEventListener('click',e=>{const s=getSeries(msgSeriesScian);if(!s?.tend)return;msgShowTend=!msgShowTend;e.target.classList.toggle('active-tend',msgShowTend);renderMensajes();});
+
+  const content=document.createElement('div');
+  content.id='msgContent';
+  wrap.appendChild(content);
+  container.appendChild(wrap);
+  msgSeriesScian='IMAI';
+  updateMsgToggles();
+  renderMensajes();
+}
+
+function updateMsgToggles(){
+  const s=getSeries(msgSeriesScian);
+  const btnDes=document.getElementById('btnDes');
+  const btnTend=document.getElementById('btnTend');
+  if(btnDes){if(s?.des)btnDes.classList.remove('disabled');else{btnDes.classList.add('disabled');btnDes.classList.remove('active-des');msgShowDes=false;}}
+  if(btnTend){if(s?.tend)btnTend.classList.remove('disabled');else{btnTend.classList.add('disabled');btnTend.classList.remove('active-tend');msgShowTend=false;}}
+}
+
+function renderMensajes(){
+  const s=getSeries(msgSeriesScian);
+  if(!s)return;
+  const content=document.getElementById('msgContent');
+  content.innerHTML='';
+  if(currentFreq==='A'){content.innerHTML='<div class="msg-empty">Los mensajes automaticos solo estan disponibles para frecuencia <strong>Mensual</strong> o <strong>Trimestral</strong>.</div>';return;}
+  if(!msgShowOrg&&!msgShowDes&&!msgShowTend){content.innerHTML='<div class="msg-empty">Selecciona al menos una serie para visualizar.</div>';return;}
+
+  const grid=document.createElement('div');
+  grid.className='msg-content';
+
+  const chartPanel=document.createElement('div');
+  chartPanel.className='msg-chart-panel';
+  chartPanel.innerHTML=`<div class="msg-chart-title">${s.name}</div><div class="msg-chart-meta">SCIAN ${s.scian} | ${RAW.periods[msgFromIdx]} → ${RAW.periods[msgToIdx]}</div><div class="msg-chart-canvas"><canvas id="msgCanvas" height="280"></canvas></div><div class="msg-chart-legend" id="msgLegend"></div>`;
+  grid.appendChild(chartPanel);
+
+  const textPanel=document.createElement('div');
+  textPanel.className='msg-text-panel';
+  textPanel.innerHTML='<div class="msg-text-title">Mensajes automaticos</div>';
+  grid.appendChild(textPanel);
+  content.appendChild(grid);
+
+  drawMsgChart(s);
+  const msgs=computeMessages(s,msgFromIdx,msgToIdx);
+  msgs.forEach(m=>{const item=document.createElement('div');item.className='msg-item';item.innerHTML=`<div class="msg-item-label">${m.label}</div><div class="msg-item-text">${m.text}</div>`;textPanel.appendChild(item);});
+}
+
+function drawMsgChart(s){
+  const ctx=document.getElementById('msgCanvas');
+  if(!ctx)return;
+  if(msgChart){msgChart.destroy();msgChart=null;}
+  const org=getVals(s,'org');
+  const des=getVals(s,'des');
+  const tend=getVals(s,'tend');
+  const sliceP=RAW.periods.slice(msgFromIdx,msgToIdx+1);
+  const sliceO=org?org.slice(msgFromIdx,msgToIdx+1):null;
+  const sliceD=des?des.slice(msgFromIdx,msgToIdx+1):null;
+  const sliceT=tend?tend.slice(msgFromIdx,msgToIdx+1):null;
+
+  const datasets=[];
+  const legendItems=[];
+  if(msgShowOrg&&sliceO){datasets.push({label:'Original',data:sliceO,borderColor:'rgba(26,86,196,0.6)',backgroundColor:'transparent',borderWidth:2,pointRadius:0,tension:0.3});legendItems.push({color:'rgba(26,86,196,0.6)',label:'Original'});}
+  if(msgShowDes&&sliceD){datasets.push({label:'Desestacionalizada',data:sliceD,borderColor:'#C0001D',backgroundColor:'transparent',borderWidth:2,pointRadius:0,tension:0.3});legendItems.push({color:'#C0001D',label:'Desestacionalizada'});}
+  if(msgShowTend&&sliceT){datasets.push({label:'Tendencia-Ciclo',data:sliceT,borderColor:'#007B5E',backgroundColor:'transparent',borderWidth:2,pointRadius:0,tension:0.4});legendItems.push({color:'#007B5E',label:'Tendencia-Ciclo'});}
+
+  const legendEl=document.getElementById('msgLegend');
+  if(legendEl)legendEl.innerHTML=legendItems.map(item=>`<div class="msg-legend-item"><div class="msg-legend-dot" style="background:${item.color}"></div><span>${item.label}</span></div>`).join('');
+  if(!datasets.length)return;
+
+  msgChart=new Chart(ctx,{type:'line',data:{labels:sliceP.map(p=>p.replace('/','-')),datasets:datasets},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false}},scales:{x:{display:true,grid:{display:false},ticks:{maxTicksLimit:12,font:{family:'IBM Plex Mono',size:9},color:'#AAAAAA',maxRotation:45,minRotation:30},border:{display:false}},y:{display:true,grid:{color:'#E4E4E0',lineWidth:0.5},ticks:{maxTicksLimit:6,font:{family:'IBM Plex Mono',size:9},color:'#AAAAAA'},border:{display:false}}}}});
+}
+
+function computeMessages(s,startIdx,endIdx){
+  const org=getVals(s,'org');
+  const des=getVals(s,'des');
+  const mainSeries=des||org;
+  const seriesLabel=des?'desestacionalizada':'original';
+  const{val:lastVal,idx:lastIdx}=getLastValid(mainSeries);
+  const messages=[];
+
+  // 1. Change over selected period
+  const startVal=mainSeries[startIdx];
+  const endVal=mainSeries[lastIdx];
+  if(startVal!=null&&endVal!=null&&startIdx!==lastIdx){
+    const chg=((endVal-startVal)/startVal)*100;
+    const dir=chg>=0?'aumento':'disminuyo';
+    const cls=chg>=0?'pos':'neg';
+    const numPeriods=lastIdx-startIdx;
+    messages.push({label:'Cambio en el periodo seleccionado',text:`Desde ${RAW.periods[startIdx]} hasta ${RAW.periods[lastIdx]} (${numPeriods} periodos), la serie ${seriesLabel} <strong>${dir}</strong> <span class="${cls}">${Math.abs(chg).toFixed(2)}%</span>.`});
+  }
+
+  // 2. Period-over-period comparison
+  if(lastIdx>=1&&mainSeries[lastIdx-1]!=null){
+    const prev=mainSeries[lastIdx-1];
+    const chg=((lastVal-prev)/prev)*100;
+    const dir=chg>=0?'incremento':'disminuyo';
+    const cls=chg>=0?'pos':'neg';
+    messages.push({label:currentFreq==='M'?'Comparacion mensual':'Comparacion trimestral',text:`La serie ${seriesLabel} <strong>${dir}</strong> <span class="${cls}">${Math.abs(chg).toFixed(2)}%</span> respecto al periodo anterior.`});
+  }
+
+  // 3. Annual comparison
+  const lag=currentFreq==='M'?12:4;
+  const{val:lastOrg,idx:loIdx}=getLastValid(org);
+  if(loIdx>=lag&&org[loIdx-lag]!=null){
+    const prevYear=org[loIdx-lag];
+    const chg=((lastOrg-prevYear)/prevYear)*100;
+    const dir=chg>=0?'crecio':'cayo';
+    const cls=chg>=0?'pos':'neg';
+    messages.push({label:'Comparacion anual',text:`En terminos interanuales (serie original), la actividad <strong>${dir}</strong> <span class="${cls}">${Math.abs(chg).toFixed(2)}%</span>.`});
+  }
+
+  // 4. Historical context - EXACT months
+  const st=getHistStats(mainSeries,lastIdx);
+  if(st){
+    if(st.isMax)messages.push({label:'Nivel historico',text:`<strong>Maximo historico</strong> de la serie ${seriesLabel} (${lastVal.toFixed(2)} en ${RAW.periods[lastIdx]}).`});
+    else if(st.isMin)messages.push({label:'Nivel historico',text:`<strong>Minimo historico</strong> de la serie ${seriesLabel} (${lastVal.toFixed(2)} en ${RAW.periods[lastIdx]}).`});
+    else if(st.varM>=0&&st.monthsAbove>0){
+      const n=st.monthsAbove;const mesMeses=n===1?'mes':'meses';
+      const desdePer=RAW.periods[lastIdx-n+1];const desde=desdePer?' (desde '+desdePer.replace('/','-')+')':'';
+      messages.push({label:'Nivel historico',text:`<strong>Maximo en ${n} ${mesMeses}${desde}</strong>. El nivel actual se encuentra <span class="neg">${Math.abs(st.pctMax).toFixed(1)}%</span> por debajo del maximo historico (${st.maxV.toFixed(2)} en ${st.maxP}).`});
+    }else if(st.varM<0&&st.monthsBelow>0){
+      const n=st.monthsBelow;const mesMeses=n===1?'mes':'meses';
+      const desdePer=RAW.periods[lastIdx-n+1];const desde=desdePer?' (desde '+desdePer.replace('/','-')+')':'';
+      messages.push({label:'Nivel historico',text:`<strong>Minimo en ${n} ${mesMeses}${desde}</strong>. El nivel actual se encuentra <span class="neg">${Math.abs(st.pctMax).toFixed(1)}%</span> por debajo del maximo historico (${st.maxV.toFixed(2)} en ${st.maxP}).`});
+    }else messages.push({label:'vs Maximo historico',text:`El nivel actual se encuentra <span class="neg">${Math.abs(st.pctMax).toFixed(1)}%</span> por debajo del maximo historico (${st.maxV.toFixed(2)} en ${st.maxP}).`});
+  }
+
+  // 5. Dynamic signal with exact consecutive months
+  if(des){
+    const sig=getSignal(des,lastIdx);
+    messages.push({label:'Senal dinamica',text:`<strong style="color:${sig.color}">${sig.label}</strong> — ${sig.sub}`});
+  }
+
+  return messages;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CONTRIBUCIONES VIEW - FIXED: peso en t-k (k=12 anual, k=1 mensual, k=4 trimestral)
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Get structure value for SCIAN at period (accepts optional estructura obj)
+function getEstructuraValue(scian,period,estObj){
+  const est=estObj||ESTRUCTURA;
+  if(!est||!est.data[scian])return null;
+  const idx=est.periods.indexOf(period);
+  if(idx<0)return null;
+  return est.data[scian][idx];
+}
+
+/// Get structure weight at period using the correct Laspeyres formula:
+// peso_i = (PIB_2018_i × I_i_org_{t-k}) / (PIB_2018_padre × I_padre_org_{t-k})
+// Always uses ORG series: PIB 2018 weights are defined in real (non-adjusted) terms,
+// so Σ peso_i = 1 holds by Laspeyres identity regardless of whether varComp uses DES or ORG.
+function getStructureWeight(compScian,parentScian,period,estObj){
+  const pibComp=PIB18&&PIB18[compScian];
+  const pibParent=PIB18&&PIB18[parentScian];
+  if(!pibComp||!pibParent){
+    // Fallback to Estructura ratio if PIB18 not available
+    const cv=getEstructuraValue(compScian,period,estObj);
+    const pv=getEstructuraValue(parentScian,period,estObj);
+    return(cv!=null&&pv!=null&&pv!==0)?cv/pv:null;
+  }
+  const compSeries=getSeries(compScian);
+  const parentSeries=getSeries(parentScian);
+  if(!compSeries||!parentSeries)return null;
+  const compArr=compSeries.org;
+  const parentArr=parentSeries.org;
+  if(!compArr||!parentArr)return null;
+  const idx=RAW.periods.indexOf(period);
+  if(idx<0)return null;
+  const cv=compArr[idx],pv=parentArr[idx];
+  if(cv==null||pv==null||pv===0)return null;
+  return(pibComp*cv)/(pibParent*pv);
+}
+
+function buildContribuciones(){
+  const container=document.getElementById('sectorsContainer');
+  container.innerHTML='';
+  const wrap=document.createElement('div');
+  wrap.className='contrib-container';
+
+  const parentIndicators=[
+    {scian:'IMAI',name:'IMAI Total',components:['21','22','23','31-33']},
+    {scian:'21',name:'Mineria',components:['211','212','213']},
+    {scian:'23',name:'Construccion',components:['236','237','238']},
+    {scian:'31-33',name:'Manufacturas',components:['311','312','313','314','315','316','321','322','323','324','325','326','327','331','332','333','334','335','336','337','339']}
+  ];
+
+  let selectHtml='';
+  parentIndicators.forEach(p=>{selectHtml+=`<option value="${p.scian}" ${p.scian==='IMAI'?'selected':''}>${p.name}</option>`;});
+
+  const configPanel=document.createElement('div');
+  configPanel.className='contrib-config';
+  configPanel.innerHTML=`
+    <div class="contrib-config-row">
+      <div class="contrib-config-group wide"><div class="contrib-config-label">Indicador principal</div><select class="contrib-select" id="contribMainSelect">${selectHtml}</select></div>
+    </div>
+    <div class="contrib-config-row">
+      <div class="contrib-config-group"><div class="contrib-config-label">Tipo de serie</div>
+        <div class="ctrl-chip-group" style="margin-top:6px">
+          <button class="ctrl-chip ${contribSerieType==='org'?'active':''}" id="cSerieOrg" onclick="setContribSerieType('org',this)">Original</button>
+          <button class="ctrl-chip ${contribSerieType==='des'?'active':''}" id="cSerieDes" onclick="setContribSerieType('des',this)">Desestacionalizada</button>
+        </div>
+      </div>
+      <div class="contrib-config-group"><div class="contrib-config-label">Tipo de variacion</div>
+        <div class="ctrl-chip-group" style="margin-top:6px">
+          <button class="ctrl-chip ${contribVarType==='M'?'active':''}" id="cVarM" onclick="setContribVarType('M',this)">Mensual</button>
+          <button class="ctrl-chip ${contribVarType==='A'?'active':''}" id="cVarA" onclick="setContribVarType('A',this)">Anual</button>
+          <button class="ctrl-chip ${contribVarType==='P'?'active':''}" id="cVarP" onclick="setContribVarType('P',this)">Personalizada</button>
+        </div>
+      </div>
+    </div>
+    <div class="contrib-config-row" id="contribBaseRow" style="display:none">
+      <div class="contrib-config-group wide"><div class="contrib-config-label">Periodo base (la grafica comienza en 0 en este mes)</div><select class="contrib-select" id="contribBaseSelect"></select></div>
+    </div>
+    <div class="contrib-config-row">
+      <div class="contrib-config-group" style="width:100%"><div class="contrib-config-label">Componentes (los no seleccionados se agrupan en "Otros")</div><div class="contrib-chips" id="contribChips"></div></div>
+    </div>
+    <div class="contrib-config-row">
+      <div class="contrib-controls">
+        <div class="contrib-config-label" style="margin-right:12px">Escala:</div>
+        <div class="contrib-scale-toggle">
+          <button class="scale-btn active" data-scale="auto" id="scaleAuto">Acotada</button>
+          <button class="scale-btn" data-scale="full" id="scaleFull">Completa</button>
+        </div>
+        <button class="contrib-download-btn" id="contribDownloadBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Descargar Excel
+        </button>
+      </div>
+    </div>`;
+  wrap.appendChild(configPanel);
+
+  const chartPanel=document.createElement('div');
+  chartPanel.className='contrib-chart-panel';
+  chartPanel.innerHTML=`<div class="contrib-chart-title" id="contribChartTitle">Contribuciones a la variacion anual del IMAI</div><div class="contrib-chart-subtitle" id="contribChartSubtitle">Variacion anual (%) y contribuciones por componente (puntos porcentuales)</div><div class="contrib-canvas-wrap"><canvas id="contribCanvas"></canvas></div><div class="contrib-legend" id="contribLegend"></div>`;
+  wrap.appendChild(chartPanel);
+  container.appendChild(wrap);
+
+  // Populate base period selector
+  const baseSelect=document.getElementById('contribBaseSelect');
+  if(baseSelect){
+    RAW.periods.forEach(p=>{baseSelect.appendChild(new Option(p.replace('/','-'),p));});
+    if(!contribBasePeriod||!RAW.periods.includes(contribBasePeriod))contribBasePeriod=RAW.periods[fromIdx]||RAW.periods[0];
+    baseSelect.value=contribBasePeriod;
+    baseSelect.addEventListener('change',e=>{contribBasePeriod=e.target.value;renderContribuciones();});
+    document.getElementById('contribBaseRow').style.display=contribVarType==='P'?'':'none';
+  }
+
+  document.getElementById('contribMainSelect').addEventListener('change',e=>{
+    contribMainIndicator=e.target.value;
+    const parent=parentIndicators.find(p=>p.scian===contribMainIndicator);
+    if(parent){contribSelectedComponents=parent.components.slice(0,4);updateContribChips();renderContribuciones();}
+  });
+  document.getElementById('scaleAuto').addEventListener('click',()=>{contribScaleMode='auto';document.getElementById('scaleAuto').classList.add('active');document.getElementById('scaleFull').classList.remove('active');renderContribuciones();});
+  document.getElementById('scaleFull').addEventListener('click',()=>{contribScaleMode='full';document.getElementById('scaleFull').classList.add('active');document.getElementById('scaleAuto').classList.remove('active');renderContribuciones();});
+  document.getElementById('contribDownloadBtn').addEventListener('click',downloadContribExcel);
+
+  updateContribChips();
+  renderContribuciones();
+}
+
+function setContribSerieType(type,btn){
+  contribSerieType=type;
+  document.querySelectorAll('#cSerieOrg,#cSerieDes').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderContribuciones();
+}
+
+function setContribVarType(type,btn){
+  contribVarType=type;
+  document.querySelectorAll('#cVarM,#cVarA,#cVarP').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const baseRow=document.getElementById('contribBaseRow');
+  if(baseRow)baseRow.style.display=type==='P'?'':'none';
+  renderContribuciones();
+}
+
+function updateContribChips(){
+  const chipsContainer=document.getElementById('contribChips');
+  if(!chipsContainer)return;
+  const parentIndicators=[{scian:'IMAI',components:['21','22','23','31-33']},{scian:'21',components:['211','212','213']},{scian:'23',components:['236','237','238']},{scian:'31-33',components:['311','312','313','314','315','316','321','322','323','324','325','326','327','331','332','333','334','335','336','337','339']}];
+  const parent=parentIndicators.find(p=>p.scian===contribMainIndicator);
+  if(!parent)return;
+
+  let html='';
+  parent.components.forEach((scian,idx)=>{
+    const s=getSeries(scian);
+    if(!s)return;
+    const isActive=contribSelectedComponents.includes(scian);
+    const color=CONTRIB_COLORS[idx%CONTRIB_COLORS.length];
+    html+=`<button class="contrib-chip ${isActive?'active':''}" data-scian="${scian}"><span class="chip-dot" style="background:${isActive?'white':color}"></span>${s.name.length>30?s.name.slice(0,30)+'...':s.name}</button>`;
+  });
+  chipsContainer.innerHTML=html;
+  chipsContainer.querySelectorAll('.contrib-chip').forEach(chip=>{
+    chip.addEventListener('click',()=>{
+      const scian=chip.dataset.scian;
+      if(contribSelectedComponents.includes(scian))contribSelectedComponents=contribSelectedComponents.filter(c=>c!==scian);
+      else contribSelectedComponents.push(scian);
+      updateContribChips();
+      renderContribuciones();
+    });
+  });
+}
+
+/**
+ * Render contributions chart
+ * Uses contribSerieType ('org'|'des') and contribVarType ('A'|'Q'|'M')
+ * Full precision in calculations — no rounding until display
+ * FORMULA: contrib_t = var_comp_t × (estructura_comp_{t-k} / estructura_parent_{t-k})
+ */
+function renderContribuciones(){
+  const ctx=document.getElementById('contribCanvas');
+  if(!ctx)return;
+  if(contribChart){contribChart.destroy();contribChart=null;}
+
+  const mainSeries=getSeries(contribMainIndicator);
+  if(!mainSeries)return;
+
+  // If desestacionalizada requested but not available for this indicator, fallback to org
+  const serieKey=(contribSerieType==='des'&&mainSeries.des)?'des':'org';
+  const estObj=serieKey==='des'?ESTRUCTURA_D:ESTRUCTURA;
+
+  const varTypeLabel=contribVarType==='A'?'anual':contribVarType==='P'?'acumulada desde base':'mensual';
+  const serieLabel=serieKey==='des'?'desestacionalizada':'original';
+  document.getElementById('contribChartTitle').textContent=contribVarType==='P'
+    ?`Contribuciones acumuladas desde ${(contribBasePeriod||'').replace('/','-')} (${serieLabel}): ${mainSeries.name}`
+    :`Contribuciones a la variacion ${varTypeLabel} (${serieLabel}): ${mainSeries.name}`;
+  document.getElementById('contribChartSubtitle').textContent=contribVarType==='P'
+    ?`Variacion acumulada (%) y contribuciones por componente (pp) respecto a ${(contribBasePeriod||'').replace('/','-')} — serie ${serieLabel}`
+    :`Variacion ${varTypeLabel} (%) y contribuciones por componente (pp) — serie ${serieLabel}`;
+
+  const parentIndicators=[{scian:'IMAI',components:['21','22','23','31-33']},{scian:'21',components:['211','212','213']},{scian:'23',components:['236','237','238']},{scian:'31-33',components:['311','312','313','314','315','316','321','322','323','324','325','326','327','331','332','333','334','335','336','337','339']}];
+  const parent=parentIndicators.find(p=>p.scian===contribMainIndicator);
+  const allComponents=parent?parent.components:[];
+
+  const visiblePeriods=[];
+  const mainVarAnual=[];
+  const componentContribs={};
+  allComponents.forEach(scian=>{componentContribs[scian]=[];});
+
+  const mainArr=getVals(mainSeries,serieKey)||getVals(mainSeries,'org');
+
+  if(contribVarType==='P'){
+    // Personalizada: variacion acumulada desde un periodo base fijo
+    const baseIdx=RAW.periods.indexOf(contribBasePeriod);
+    if(baseIdx<0)return;
+    const mainBase=mainArr[baseIdx];
+    if(mainBase==null||mainBase===0)return;
+
+    for(let rawIdx=baseIdx;rawIdx<=toIdx;rawIdx++){
+      visiblePeriods.push(RAW.periods[rawIdx]);
+      const mainCur=mainArr[rawIdx];
+      mainVarAnual.push(mainCur!=null?((mainCur-mainBase)/mainBase)*100:null);
+
+      allComponents.forEach(scian=>{
+        const compSeries=getSeries(scian);
+        if(!compSeries){componentContribs[scian].push(null);return;}
+        const compKey=(serieKey==='des'&&compSeries.des)?'des':'org';
+        const compArr2=getVals(compSeries,compKey)||getVals(compSeries,'org');
+        if(!compArr2){componentContribs[scian].push(null);return;}
+        const compCur=compArr2[rawIdx];
+        const compBase=compArr2[baseIdx];
+        const compVA=(compCur!=null&&compBase!=null&&compBase!==0)?(compCur-compBase)/compBase:null;
+        // Peso fijo en el periodo base
+        const peso=getStructureWeight(scian,contribMainIndicator,contribBasePeriod,estObj);
+        componentContribs[scian].push((compVA!=null&&peso!=null)?compVA*peso*100:null);
+      });
+    }
+  } else {
+    // Mensual (lag=1) o Anual (lag=12)
+    const lag=contribVarType==='A'?12:1;
+
+    for(let rawIdx=Math.max(fromIdx,lag);rawIdx<=toIdx;rawIdx++){
+      const periodLag=RAW.periods[rawIdx-lag];
+      visiblePeriods.push(RAW.periods[rawIdx]);
+
+      const mainCur=mainArr[rawIdx];
+      const mainPrev=mainArr[rawIdx-lag];
+      mainVarAnual.push((mainCur!=null&&mainPrev!=null&&mainPrev!==0)?((mainCur-mainPrev)/mainPrev)*100:null);
+
+      allComponents.forEach(scian=>{
+        const compSeries=getSeries(scian);
+        if(!compSeries){componentContribs[scian].push(null);return;}
+        const compKey=(serieKey==='des'&&compSeries.des)?'des':'org';
+        const compArr2=getVals(compSeries,compKey)||getVals(compSeries,'org');
+        if(!compArr2){componentContribs[scian].push(null);return;}
+        const compCur=compArr2[rawIdx];
+        const compPrev=compArr2[rawIdx-lag];
+        const compVA=(compCur!=null&&compPrev!=null&&compPrev!==0)?(compCur-compPrev)/compPrev:null;
+        const peso=getStructureWeight(scian,contribMainIndicator,periodLag,estObj);
+        componentContribs[scian].push((compVA!=null&&peso!=null)?compVA*peso*100:null);
+      });
+    }
+  }
+
+  // Prepare chart data
+  const otherComponents=allComponents.filter(c=>!contribSelectedComponents.includes(c));
+  const componentData=[];
+  lastContribData={periods:visiblePeriods,mainIndicator:mainSeries.name,serieType:serieKey,varType:contribVarType,basePeriod:contribBasePeriod,mainVarAnual,components:[]};
+
+  contribSelectedComponents.forEach((scian,idx)=>{
+    const s=getSeries(scian);
+    if(!s)return;
+    componentData.push({scian,name:s.name,color:CONTRIB_COLORS[idx%CONTRIB_COLORS.length],contributions:componentContribs[scian]});
+    lastContribData.components.push({name:s.name,scian,contributions:componentContribs[scian]});
+  });
+
+  if(otherComponents.length>0){
+    const otrosContributions=visiblePeriods.map((_,i)=>{
+      let sum=0,hasData=false;
+      otherComponents.forEach(scian=>{const c=componentContribs[scian][i];if(c!=null){sum+=c;hasData=true;}});
+      return hasData?sum:null;
+    });
+    componentData.push({scian:'otros',name:'Otros',color:'#95A5A6',contributions:otrosContributions});
+    lastContribData.components.push({name:'Otros',scian:'otros',contributions:otrosContributions});
+  }
+
+  const datasets=[];
+  componentData.forEach(comp=>{
+    datasets.push({type:'bar',label:comp.name,data:comp.contributions,backgroundColor:comp.color+'99',borderColor:comp.color,borderWidth:1,stack:'contributions',order:2});
+  });
+  const lineLabel=contribVarType==='P'?`Var. acumulada desde ${(contribBasePeriod||'').replace('/','-')}`:'Variacion '+varTypeLabel+' total';
+  datasets.push({type:'line',label:lineLabel,data:mainVarAnual,borderColor:'#0C1220',backgroundColor:'transparent',borderWidth:3,pointRadius:3,pointBackgroundColor:'#0C1220',tension:0.1,order:1});
+
+  const allValues=[...mainVarAnual.filter(v=>v!=null)];
+  componentData.forEach(comp=>{allValues.push(...comp.contributions.filter(v=>v!=null));});
+  const lim=contribScaleMode==='auto'?clipLimits(allValues,0.02,0.98,true):fullLimits(allValues,true);
+
+  contribChart=new Chart(ctx,{type:'bar',data:{labels:visiblePeriods.map(p=>p.replace('/','-')),datasets},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:c=>c.dataset.label+': '+(c.parsed.y!=null?c.parsed.y.toFixed(2)+' pp':'N/D')}}},scales:{x:{stacked:true,display:true,grid:{display:false},ticks:{maxTicksLimit:16,font:{family:'IBM Plex Mono',size:10},color:'#AAAAAA',maxRotation:45,minRotation:30},border:{display:false}},y:{stacked:true,display:true,min:lim.min,max:lim.max,grid:{color:c=>c.tick.value===0?'#33333380':'#E4E4E0',lineWidth:c=>c.tick.value===0?1.5:0.5},ticks:{stepSize:lim.step,font:{family:'IBM Plex Mono',size:10},color:'#AAAAAA',callback:v=>v.toFixed(1)+'%'},border:{display:false}}}}});
+
+  const legendEl=document.getElementById('contribLegend');
+  if(legendEl){
+    let legendHtml=`<div class="contrib-legend-item"><div class="contrib-legend-line" style="background:#0C1220"></div><span>${lineLabel}</span></div>`;
+    componentData.forEach(comp=>{legendHtml+=`<div class="contrib-legend-item"><div class="contrib-legend-dot" style="background:${comp.color}"></div><span>${comp.name.length>25?comp.name.slice(0,25)+'...':comp.name}</span></div>`;});
+    legendEl.innerHTML=legendHtml;
+  }
+}
+
+function downloadContribExcel(){
+  if(!lastContribData){alert('No hay datos para descargar.');return;}
+  const wb=XLSX.utils.book_new();
+  const varHdr=lastContribData.varType==='A'?'Var. Anual Total (%)':lastContribData.varType==='P'?`Var. Acumulada desde ${(lastContribData.basePeriod||'').replace('/','-')} (%)`:'Var. Mensual Total (%)';
+  const headers=['Periodo',varHdr];
+  lastContribData.components.forEach(c=>{headers.push('Contrib. '+c.name+' (pp)');});
+  const data=[headers];
+  lastContribData.periods.forEach((p,i)=>{
+    const row=[p.replace('/','-'),lastContribData.mainVarAnual[i]!=null?lastContribData.mainVarAnual[i]:''];
+    lastContribData.components.forEach(c=>{row.push(c.contributions[i]!=null?c.contributions[i]:'');});
+    data.push(row);
+  });
+  const ws=XLSX.utils.aoa_to_sheet(data);
+  ws['!cols']=[{wch:12},{wch:18}];
+  lastContribData.components.forEach(()=>ws['!cols'].push({wch:22}));
+  XLSX.utils.book_append_sheet(wb,ws,'Contribuciones');
+  const filename=`Contribuciones_${lastContribData.mainIndicator.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.xlsx`;
+  XLSX.writeFile(wb,filename);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// BUILD SECTORS
+// ══════════════════════════════════════════════════════════════════════════════
+function buildSectors(){
+  const container=document.getElementById('sectorsContainer');
+  container.innerHTML='';
+  allCharts.forEach(c=>c.destroy());
+  allCharts=[];
+
+  if(currentView==='mensajes'){buildMensajes();return;}
+  if(currentView==='contribuciones'){buildContribuciones();return;}
+
+  ['total','mineria','energia','construccion','manufactura'].forEach(sector=>{
+    const ser=getSeriesForSector(sector);
+    const color=SECTOR_COLORS[sector];
+    const mainS=ser[0];
+    if(!mainS)return;
+    const mainOrg=getVals(mainS,'org');
+    const{val:hV,idx:hI}=getLastValid(mainOrg);
+    const hVa=calcVarAnualM(mainOrg,hI);
+
+    const hdr=document.createElement('div');
+    hdr.className='sector-header';
+    hdr.innerHTML=`<div class="sector-accent" style="background:${color}"></div><div class="sector-name">${SECTOR_LABELS[sector]}</div><div class="sector-scian">SCIAN ${mainS.scian}</div><div class="sector-val">${fmt(hV)}&nbsp;<span style="color:${hVa>=0?'#145C38':'#C0001D'};font-size:11px">(${fmtP(hVa)})</span></div>`;
+    container.appendChild(hdr);
+
+    if(currentView==='tablas')buildTable(container,ser);
+    else{const grid=document.createElement('div');grid.className='cards-grid';container.appendChild(grid);ser.forEach(s=>buildCards(grid,s,color));}
+  });
+  updateInfo();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// REBASE ENGINE
+// ══════════════════════════════════════════════════════════════════════════════
+function openRebase(){buildRebaseSelects();updateRbPreview();document.getElementById('rebaseOverlay').classList.add('open');}
+function closeRebase(){document.getElementById('rebaseOverlay').classList.remove('open');}
+function closeRebaseOuter(e){if(e.target===document.getElementById('rebaseOverlay'))closeRebase();}
+
+function setRbType(t,btn){
+  document.querySelectorAll('[data-rbtype]').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  rebaseType=t;
+  buildRebaseSelects();
+  updateRbPreview();
+}
+
+function buildRebaseSelects(){
+  const wrap=document.getElementById('rbSelects');
+  wrap.innerHTML='';
+  if(rebaseType==='A'){
+    const years=[...new Set(RAW.periods.map(p=>p.split('/')[0]))].sort();
+    const sel=makeRbSelect('Ano','rbYear',years,'2018');
+    sel.addEventListener('change',updateRbPreview);
+    wrap.appendChild(sel);
+  }else if(rebaseType==='Q'){
+    const years=[...new Set(RAW.periods.map(p=>p.split('/')[0]))].sort();
+    const yw=makeRbSelect('Ano','rbYear',years,'2018');
+    const qw=makeRbSelect('Trimestre','rbQ',['Q1','Q2','Q3','Q4'],'Q1');
+    yw.addEventListener('change',updateRbPreview);
+    qw.addEventListener('change',updateRbPreview);
+    wrap.appendChild(yw);wrap.appendChild(qw);
+  }else{
+    const years=[...new Set(RAW.periods.map(p=>p.split('/')[0]))].sort();
+    const months=[['01','Enero'],['02','Febrero'],['03','Marzo'],['04','Abril'],['05','Mayo'],['06','Junio'],['07','Julio'],['08','Agosto'],['09','Septiembre'],['10','Octubre'],['11','Noviembre'],['12','Diciembre']];
+    const yw=makeRbSelect('Ano','rbYear',years,'2018');
+    const mw=makeRbSelect('Mes','rbMonth',months.map(([v,l])=>({v,l})),'01');
+    yw.addEventListener('change',updateRbPreview);
+    mw.querySelector('select').addEventListener('change',updateRbPreview);
+    wrap.appendChild(yw);wrap.appendChild(mw);
+  }
+}
+
+function makeRbSelect(label,id,options,defaultVal){
+  const wrap=document.createElement('div');
+  wrap.className='rb-select-wrap';
+  const lbl=document.createElement('div');
+  lbl.className='rb-select-label';
+  lbl.textContent=label;
+  const sel=document.createElement('select');
+  sel.id=id;sel.className='rb-select';
+  options.forEach(o=>{const v=typeof o==='object'?o.v:o;const l=typeof o==='object'?o.l:o;const opt=new Option(l,v);if(v===defaultVal)opt.selected=true;sel.appendChild(opt);});
+  wrap.appendChild(lbl);wrap.appendChild(sel);
+  return wrap;
+}
+
+function getRbPeriods(){
+  const yr=document.getElementById('rbYear')?.value;
+  if(!yr)return[];
+  if(rebaseType==='A')return RAW.periods.reduce((acc,p,i)=>{if(p.startsWith(yr+'/'))acc.push(i);return acc;},[]);
+  else if(rebaseType==='Q'){
+    const q=document.getElementById('rbQ')?.value;
+    const qn=q?+q[1]:1;
+    const months=[(qn-1)*3+1,(qn-1)*3+2,qn*3].map(m=>yr+'/'+String(m).padStart(2,'0'));
+    return RAW.periods.reduce((acc,p,i)=>{if(months.includes(p))acc.push(i);return acc;},[]);
+  }else{
+    const mo=document.getElementById('rbMonth')?.value||'01';
+    const target=yr+'/'+mo;
+    const idx=RAW.periods.indexOf(target);
+    return idx>=0?[idx]:[];
+  }
+}
+
+function getRbLabel(){
+  const yr=document.getElementById('rbYear')?.value||'2018';
+  if(rebaseType==='A')return yr+' = 100';
+  if(rebaseType==='Q'){const q=document.getElementById('rbQ')?.value||'Q1';return yr+'-'+q+' = 100';}
+  const mo=document.getElementById('rbMonth')?.value||'01';
+  const mnames=['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  return mnames[+mo]+' '+yr+' = 100';
+}
+
+function computeFactors(indices){
+  const result={};
+  Object.values(RAW.series).forEach(s=>{
+    const avg=arr=>{if(!arr)return null;const vals=indices.map(i=>arr[i]).filter(v=>v!=null);return vals.length?vals.reduce((a,b)=>a+b)/vals.length:null;};
+    result[s.scian]={org:avg(s.org),des:avg(s.des),tend:avg(s.tend)};
+  });
+  return result;
+}
+
+function updateRbPreview(){
+  const idxs=getRbPeriods();
+  const preview=document.getElementById('rbPreview');
+  if(!idxs.length){preview.innerHTML='<span style="color:var(--neg)">Periodo no disponible en los datos.</span>';return;}
+  const label=getRbLabel();
+  const factors=computeFactors(idxs);
+  const s0=getSeries('IMAI');
+  const f0=factors['IMAI']?.org;
+  const lastIdx=RAW.periods.length-1;
+  const lastRaw=s0.org[lastIdx];
+  const lastReb=lastRaw&&f0?(lastRaw/f0)*100:null;
+  preview.innerHTML='<strong>Base: '+label+'</strong><br>Periodo: '+(idxs.length===1?RAW.periods[idxs[0]]:RAW.periods[idxs[0]]+' → '+RAW.periods[idxs[idxs.length-1]])+' ('+idxs.length+' obs. promediadas)<br>Ejemplo: IMAI Total: '+(f0?f0.toFixed(2)+' → 100.00':'N/D')+' | Ultimo dato: '+(lastReb?lastReb.toFixed(2):'N/D');
+}
+
+function applyRebase(){
+  const idxs=getRbPeriods();
+  if(!idxs.length){alert('Periodo no disponible.');return;}
+  const label=getRbLabel();
+  const factors=computeFactors(idxs);
+  rebaseBase={label,factors};
+  document.getElementById('baseIndicator').textContent='BASE '+label;
+  closeRebase();
+  redrawAll();
+}
+
+function downloadCSV(which){
+  const idxs=getRbPeriods();
+  if(!idxs.length){alert('Selecciona un periodo base primero.');return;}
+  const label=getRbLabel().replace(/[^a-zA-Z0-9]/g,'_');
+  const factors=computeFactors(idxs);
+  const keys=which==='org'?['org']:which==='des'?['des']:['org','des','tend'];
+  const allSeries=Object.values(RAW.series);
+  const header=['Periodo',...allSeries.flatMap(s=>keys.filter(k=>s[k]!=null).map(k=>'"'+s.name.replace(/"/g,'""')+' ['+s.scian+'] '+k+'"'))];
+  const rows=RAW.periods.map((p,pi)=>{
+    const cells=[p,...allSeries.flatMap(s=>keys.filter(k=>s[k]!=null).map(k=>{const f=factors[s.scian]?.[k];const v=s[k][pi];const rv=(v!=null&&f)?(v/f)*100:null;return rv!=null?rv.toFixed(4):'';}))];
+    return cells.join(',');
+  });
+  const csv=[header.join(','),...rows].join('\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download='IMAI_base_'+label+'_'+which+'.csv';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// REDRAW AND INIT
+// ══════════════════════════════════════════════════════════════════════════════
+function redrawAll(){
+  allCharts.forEach(c=>c.destroy());
+  allCharts=[];
+  if(msgChart){msgChart.destroy();msgChart=null;}
+  if(contribChart){contribChart.destroy();contribChart=null;}
+  buildSummary();
+  buildSectors();
+}
+
+function initDashboard(){
+  toIdx=RAW.periods.length-1;
+  fromIdx=Math.max(0,toIdx-119);
+  RAW.periods.forEach((p,i)=>{selFrom.appendChild(new Option(p.replace('/','-'),i));selTo.appendChild(new Option(p.replace('/','-'),i));});
+  selFrom.value=fromIdx;
+  selTo.value=toIdx;
+  document.getElementById('lastPeriodHdr').textContent=RAW.periods[toIdx].replace('/','-');
+  const seriesCount=Object.keys(RAW.series).length;
+  document.querySelector('.header-sub').textContent=`INEGI · BIE · ${seriesCount} SERIES · SCIAN 2018`;
+  // Show scale toggle by default (initial view is graficas)
+  const scaleCg=document.getElementById('graficasScaleCg');
+  if(scaleCg)scaleCg.style.display='flex';
+  buildRebaseSelects();
+  buildSummary();
+  buildSectors();
+  updateInfo();
+}
+
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeRebase();closeModalBtn();}});
+loadExcelAndInit();
+</script>
+</body>
+</html>
