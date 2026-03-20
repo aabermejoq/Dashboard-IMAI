@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>IMAI — Actividad Industrial</title>
+<title>Dashboard IMAI</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 <style>
@@ -234,6 +234,10 @@
   .scale-btn.active{background:var(--navy);color:white}
   .contrib-download-btn{display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:6px;border:1px solid var(--green2);background:white;color:var(--green2);font-size:11px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer;transition:all 0.15s}
   .contrib-download-btn:hover{background:var(--green2);color:white}
+  .periodo-group{border:1px solid var(--border2);border-radius:8px;padding:10px 16px;display:flex;flex-direction:column;gap:8px;flex:1}
+  .periodo-group-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--navy);padding-bottom:6px;border-bottom:1px solid var(--border2)}
+  .periodo-group-selects{display:flex;gap:12px;align-items:flex-end}
+  .periodo-vs{font-size:18px;font-weight:700;color:var(--text4);align-self:center;padding:0 6px;flex-shrink:0}
   .contrib-chart-panel{background:var(--surface);border:1px solid var(--border2);border-radius:12px;padding:24px;box-shadow:0 1px 4px rgba(0,0,0,0.05)}
   .contrib-chart-title{font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:var(--navy);margin-bottom:6px}
   .contrib-chart-subtitle{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text3);margin-bottom:20px}
@@ -250,7 +254,7 @@
 
 <div class="header">
   <div class="header-left">
-    <div class="header-title">Indicador Mensual de la Actividad Industrial</div>
+    <div class="header-title">Dashboard Indicador Mensual de la Actividad Industrial</div>
     <div class="header-sub">INEGI · BIE · SCIAN 2018</div>
   </div>
   <div class="header-right">
@@ -414,9 +418,14 @@ let currentFreq='M',currentView='graficas',currentMode='variaciones';
 let graficasScaleMode='auto';
 let msgChart=null,msgSeriesScian='IMAI',msgShowOrg=false,msgShowDes=true,msgShowTend=true,msgFromIdx=0,msgToIdx=0;
 let contribChart=null,contribMainIndicator='IMAI',contribSelectedComponents=['21','22','23','31-33'],contribScaleMode='auto',lastContribData=null;
-let contribSerieType='org'; // 'org' | 'des'
-let contribVarType='A';     // 'A' | 'M' | 'P'
-let contribBasePeriod=null; // periodo base para modo Personalizada
+let contribSerieType='org'; // derivado de contribMode
+let contribVarType='A';     // derivado de contribMode
+let contribMode='MA';       // 'MD'|'MA'|'TD'|'TA'|'P'
+let contribBasePeriod=null; // periodo base para modo Personalizada (legado)
+let contribBasePeriodFrom=null; // inicio del periodo base (personalizada)
+let contribBasePeriodTo=null;   // fin del periodo base (personalizada)
+let contribEndPeriodFrom=null;  // inicio del periodo final (personalizada)
+let contribEndPeriodTo=null;    // fin del periodo final (personalizada)
 let rebaseType='A',rebaseBase=null;
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1065,13 +1074,16 @@ function buildSummary(){
     const s=getSeries(scian);
     if(!s)return;
     const org=getVals(s,'org');
+    const des=getVals(s,'des');
     const{val,idx}=getLastValid(org);
+    const{idx:ldIdx}=getLastValid(des);
     const va=calcVarAnualM(org,idx);
+    const vm=des?calcVarMensM(des,ldIdx):null;
     const baseLabel=rebaseBase?rebaseBase.label:'2018=100';
     const c=document.createElement('div');
     c.className='sum-card';
     c.style.setProperty('--c',SECTOR_COLORS[sec]);
-    c.innerHTML=`<div class="sum-label">${sec==='total'?'IMAI Total':SECTOR_LABELS[sec]}</div><div class="sum-val">${fmt(val)}</div><div class="sum-period">Base ${baseLabel} | ${idx>=0?RAW.periods[idx].replace('/',' '):''}</div><span class="sum-badge ${chgCls(va)}">${fmtP(va)} a/a</span>`;
+    c.innerHTML=`<div class="sum-label">${sec==='total'?'IMAI Total':SECTOR_LABELS[sec]}</div><div class="sum-val">${fmt(val)}</div><div class="sum-period">Base ${baseLabel} | ${idx>=0?RAW.periods[idx].replace('/',' '):''}</div><span class="sum-badge ${chgCls(va)}">${fmtP(va)} a/a</span>${vm!=null?`<span class="sum-badge ${chgCls(vm)}" style="margin-left:4px">${fmtP(vm)} m/m desest.</span>`:''}`;
     g.appendChild(c);
   });
 }
@@ -1419,22 +1431,32 @@ function buildContribuciones(){
       <div class="contrib-config-group wide"><div class="contrib-config-label">Indicador principal</div><select class="contrib-select" id="contribMainSelect">${selectHtml}</select></div>
     </div>
     <div class="contrib-config-row">
-      <div class="contrib-config-group"><div class="contrib-config-label">Tipo de serie</div>
-        <div class="ctrl-chip-group" style="margin-top:6px">
-          <button class="ctrl-chip ${contribSerieType==='org'?'active':''}" id="cSerieOrg" onclick="setContribSerieType('org',this)">Original</button>
-          <button class="ctrl-chip ${contribSerieType==='des'?'active':''}" id="cSerieDes" onclick="setContribSerieType('des',this)">Desestacionalizada</button>
-        </div>
-      </div>
-      <div class="contrib-config-group"><div class="contrib-config-label">Tipo de variacion</div>
-        <div class="ctrl-chip-group" style="margin-top:6px">
-          <button class="ctrl-chip ${contribVarType==='M'?'active':''}" id="cVarM" onclick="setContribVarType('M',this)">Mensual</button>
-          <button class="ctrl-chip ${contribVarType==='A'?'active':''}" id="cVarA" onclick="setContribVarType('A',this)">Anual</button>
-          <button class="ctrl-chip ${contribVarType==='P'?'active':''}" id="cVarP" onclick="setContribVarType('P',this)">Personalizada</button>
-        </div>
+      <div class="contrib-config-group wide"><div class="contrib-config-label">Tipo de calculo</div>
+        <select class="contrib-select" id="contribModeSelect">
+          <option value="MD" ${contribMode==='MD'?'selected':''}>Series mensuales — variaciones desestacionalizadas (m/m)</option>
+          <option value="MA" ${contribMode==='MA'?'selected':''}>Series mensuales — variaciones anuales originales (a/a)</option>
+          <option value="TD" ${contribMode==='TD'?'selected':''}>Series trimestrales — variaciones trimestrales desest. (t/t)</option>
+          <option value="TA" ${contribMode==='TA'?'selected':''}>Series trimestrales — variaciones anuales originales (a/a)</option>
+          <option value="P"  ${contribMode==='P'?'selected':''}>Personalizada</option>
+        </select>
       </div>
     </div>
     <div class="contrib-config-row" id="contribBaseRow" style="display:none">
-      <div class="contrib-config-group wide"><div class="contrib-config-label">Periodo base (la grafica comienza en 0 en este mes)</div><select class="contrib-select" id="contribBaseSelect"></select></div>
+      <div class="periodo-group">
+        <div class="periodo-group-label">Periodo base (referencia = 0)</div>
+        <div class="periodo-group-selects">
+          <div class="contrib-config-group"><div class="contrib-config-label">Desde</div><select class="contrib-select" id="contribBaseFromSelect"></select></div>
+          <div class="contrib-config-group"><div class="contrib-config-label">Hasta</div><select class="contrib-select" id="contribBaseToSelect"></select></div>
+        </div>
+      </div>
+      <div class="periodo-vs">vs</div>
+      <div class="periodo-group">
+        <div class="periodo-group-label">Periodo final (comparacion)</div>
+        <div class="periodo-group-selects">
+          <div class="contrib-config-group"><div class="contrib-config-label">Desde</div><select class="contrib-select" id="contribEndFromSelect"></select></div>
+          <div class="contrib-config-group"><div class="contrib-config-label">Hasta</div><select class="contrib-select" id="contribEndToSelect"></select></div>
+        </div>
+      </div>
     </div>
     <div class="contrib-config-row">
       <div class="contrib-config-group" style="width:100%"><div class="contrib-config-label">Componentes (los no seleccionados se agrupan en "Otros")</div><div class="contrib-chips" id="contribChips"></div></div>
@@ -1460,15 +1482,38 @@ function buildContribuciones(){
   wrap.appendChild(chartPanel);
   container.appendChild(wrap);
 
-  // Populate base period selector
-  const baseSelect=document.getElementById('contribBaseSelect');
-  if(baseSelect){
-    RAW.periods.forEach(p=>{baseSelect.appendChild(new Option(p.replace('/','-'),p));});
-    if(!contribBasePeriod||!RAW.periods.includes(contribBasePeriod))contribBasePeriod=RAW.periods[fromIdx]||RAW.periods[0];
-    baseSelect.value=contribBasePeriod;
-    baseSelect.addEventListener('change',e=>{contribBasePeriod=e.target.value;renderContribuciones();});
-    document.getElementById('contribBaseRow').style.display=contribVarType==='P'?'':'none';
+  // Populate period selectors for personalizada mode
+  const baseFromSel=document.getElementById('contribBaseFromSelect');
+  const baseToSel=document.getElementById('contribBaseToSelect');
+  const endFromSel=document.getElementById('contribEndFromSelect');
+  const endToSel=document.getElementById('contribEndToSelect');
+  if(baseFromSel){
+    RAW.periods.forEach(p=>{
+      baseFromSel.appendChild(new Option(p.replace('/','-'),p));
+      baseToSel.appendChild(new Option(p.replace('/','-'),p));
+      endFromSel.appendChild(new Option(p.replace('/','-'),p));
+      endToSel.appendChild(new Option(p.replace('/','-'),p));
+    });
+    const defaultBase=RAW.periods[fromIdx]||RAW.periods[0];
+    const defaultEnd=RAW.periods[toIdx]||RAW.periods[RAW.periods.length-1];
+    if(!contribBasePeriodFrom||!RAW.periods.includes(contribBasePeriodFrom))contribBasePeriodFrom=defaultBase;
+    if(!contribBasePeriodTo||!RAW.periods.includes(contribBasePeriodTo))contribBasePeriodTo=contribBasePeriodFrom;
+    if(!contribEndPeriodFrom||!RAW.periods.includes(contribEndPeriodFrom))contribEndPeriodFrom=defaultEnd;
+    if(!contribEndPeriodTo||!RAW.periods.includes(contribEndPeriodTo))contribEndPeriodTo=contribEndPeriodFrom;
+    baseFromSel.value=contribBasePeriodFrom;
+    baseToSel.value=contribBasePeriodTo;
+    endFromSel.value=contribEndPeriodFrom;
+    endToSel.value=contribEndPeriodTo;
+    baseFromSel.addEventListener('change',e=>{contribBasePeriodFrom=e.target.value;renderContribuciones();});
+    baseToSel.addEventListener('change',e=>{contribBasePeriodTo=e.target.value;renderContribuciones();});
+    endFromSel.addEventListener('change',e=>{contribEndPeriodFrom=e.target.value;renderContribuciones();});
+    endToSel.addEventListener('change',e=>{contribEndPeriodTo=e.target.value;renderContribuciones();});
+    document.getElementById('contribBaseRow').style.display=contribMode==='P'?'':'none';
   }
+
+  document.getElementById('contribModeSelect').addEventListener('change',e=>{
+    setContribMode(e.target.value);
+  });
 
   document.getElementById('contribMainSelect').addEventListener('change',e=>{
     contribMainIndicator=e.target.value;
@@ -1483,19 +1528,10 @@ function buildContribuciones(){
   renderContribuciones();
 }
 
-function setContribSerieType(type,btn){
-  contribSerieType=type;
-  document.querySelectorAll('#cSerieOrg,#cSerieDes').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  renderContribuciones();
-}
-
-function setContribVarType(type,btn){
-  contribVarType=type;
-  document.querySelectorAll('#cVarM,#cVarA,#cVarP').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
+function setContribMode(mode){
+  contribMode=mode;
   const baseRow=document.getElementById('contribBaseRow');
-  if(baseRow)baseRow.style.display=type==='P'?'':'none';
+  if(baseRow)baseRow.style.display=mode==='P'?'':'none';
   renderContribuciones();
 }
 
@@ -1526,9 +1562,15 @@ function updateContribChips(){
   });
 }
 
+function avgArr(arr,i0,i1){
+  let sum=0,n=0;
+  for(let i=i0;i<=i1;i++){if(arr[i]!=null&&isFinite(arr[i])){sum+=arr[i];n++;}}
+  return n>0?sum/n:null;
+}
+
 /**
  * Render contributions chart
- * Uses contribSerieType ('org'|'des') and contribVarType ('A'|'Q'|'M')
+ * Uses contribSerieType ('org'|'des') and contribVarType ('A'|'Q'|'M'|'P')
  * Full precision in calculations — no rounding until display
  * FORMULA: contrib_t = var_comp_t × (estructura_comp_{t-k} / estructura_parent_{t-k})
  */
@@ -1540,18 +1582,29 @@ function renderContribuciones(){
   const mainSeries=getSeries(contribMainIndicator);
   if(!mainSeries)return;
 
-  // If desestacionalizada requested but not available for this indicator, fallback to org
-  const serieKey=(contribSerieType==='des'&&mainSeries.des)?'des':'org';
+  // Derivar parámetros desde contribMode
+  const modeUseDes=contribMode==='MD'||contribMode==='TD';
+  const serieKey=(modeUseDes&&mainSeries.des)?'des':'org';
   const estObj=serieKey==='des'?ESTRUCTURA_D:ESTRUCTURA;
+  const isQuarterly=contribMode==='TD'||contribMode==='TA';
+  // lag en meses: MD=1, MA=12, TD=3(trimestral), TA=12(anual sobre trimestral)
+  const modeLag=contribMode==='MD'?1:contribMode==='MA'?12:contribMode==='TD'?3:12;
 
-  const varTypeLabel=contribVarType==='A'?'anual':contribVarType==='P'?'acumulada desde base':'mensual';
+  const modeLabels={MD:'variacion mensual desestacionalizada',MA:'variacion anual original',TD:'variacion trimestral desest.',TA:'variacion anual original (trim.)',P:'personalizada'};
+  const varTypeLabel=modeLabels[contribMode]||'';
   const serieLabel=serieKey==='des'?'desestacionalizada':'original';
-  document.getElementById('contribChartTitle').textContent=contribVarType==='P'
-    ?`Contribuciones acumuladas desde ${(contribBasePeriod||'').replace('/','-')} (${serieLabel}): ${mainSeries.name}`
-    :`Contribuciones a la variacion ${varTypeLabel} (${serieLabel}): ${mainSeries.name}`;
-  document.getElementById('contribChartSubtitle').textContent=contribVarType==='P'
-    ?`Variacion acumulada (%) y contribuciones por componente (pp) respecto a ${(contribBasePeriod||'').replace('/','-')} — serie ${serieLabel}`
-    :`Variacion ${varTypeLabel} (%) y contribuciones por componente (pp) — serie ${serieLabel}`;
+  const bfLbl=(contribBasePeriodFrom||contribBasePeriod||'').replace('/','-');
+  const btLbl=(contribBasePeriodTo||contribBasePeriodFrom||contribBasePeriod||'').replace('/','-');
+  const efLbl=(contribEndPeriodFrom||'').replace('/','-');
+  const etLbl=(contribEndPeriodTo||contribEndPeriodFrom||'').replace('/','-');
+  const basePeriodLabel=bfLbl===btLbl?bfLbl:`${bfLbl} a ${btLbl}`;
+  const endPeriodLabel=efLbl===etLbl?efLbl:`${efLbl} a ${etLbl}`;
+  document.getElementById('contribChartTitle').textContent=contribMode==='P'
+    ?`Contribuciones: [${basePeriodLabel}] vs [${endPeriodLabel}] (${serieLabel}): ${mainSeries.name}`
+    :`Contribuciones — ${varTypeLabel} (${serieLabel}): ${mainSeries.name}`;
+  document.getElementById('contribChartSubtitle').textContent=contribMode==='P'
+    ?`Variacion acumulada (%) respecto al promedio de [${basePeriodLabel}] — serie ${serieLabel}`
+    :`Variacion (%) y contribuciones por componente (pp) — ${varTypeLabel} — serie ${serieLabel}`;
 
   const parentIndicators=[{scian:'IMAI',components:['21','22','23','31-33']},{scian:'21',components:['211','212','213']},{scian:'23',components:['236','237','238']},{scian:'31-33',components:['311','312','313','314','315','316','321','322','323','324','325','326','327','331','332','333','334','335','336','337','339']}];
   const parent=parentIndicators.find(p=>p.scian===contribMainIndicator);
@@ -1564,42 +1617,58 @@ function renderContribuciones(){
 
   const mainArr=getVals(mainSeries,serieKey)||getVals(mainSeries,'org');
 
-  if(contribVarType==='P'){
-    // Personalizada: variacion acumulada desde un periodo base fijo
-    const baseIdx=RAW.periods.indexOf(contribBasePeriod);
-    if(baseIdx<0)return;
-    const mainBase=mainArr[baseIdx];
-    if(mainBase==null||mainBase===0)return;
+  if(contribMode==='P'){
+    // Personalizada: dos barras — base (=0) y final (variacion respecto al promedio base)
+    const bFromIdx=RAW.periods.indexOf(contribBasePeriodFrom||contribBasePeriod);
+    const bToIdx=RAW.periods.indexOf(contribBasePeriodTo||contribBasePeriodFrom||contribBasePeriod);
+    const eFromIdx=RAW.periods.indexOf(contribEndPeriodFrom||RAW.periods[toIdx]);
+    const eToIdx=RAW.periods.indexOf(contribEndPeriodTo||contribEndPeriodFrom||RAW.periods[toIdx]);
+    if(bFromIdx<0||bToIdx<0||eFromIdx<0||eToIdx<0)return;
+    const bF=Math.min(bFromIdx,bToIdx),bT=Math.max(bFromIdx,bToIdx);
+    const eF=Math.min(eFromIdx,eToIdx),eT=Math.max(eFromIdx,eToIdx);
+    const mainAvgBase=avgArr(mainArr,bF,bT);
+    if(mainAvgBase==null||mainAvgBase===0)return;
 
-    for(let rawIdx=baseIdx;rawIdx<=toIdx;rawIdx++){
-      visiblePeriods.push(RAW.periods[rawIdx]);
+    // Barra de referencia: periodo base = 0
+    visiblePeriods.push(basePeriodLabel);
+    mainVarAnual.push(0);
+    allComponents.forEach(scian=>{componentContribs[scian].push(0);});
+
+    // Una barra por cada mes del periodo final vs el promedio base
+    for(let rawIdx=eF;rawIdx<=eT&&rawIdx<=toIdx;rawIdx++){
+      visiblePeriods.push(RAW.periods[rawIdx].replace('/','-'));
       const mainCur=mainArr[rawIdx];
-      mainVarAnual.push(mainCur!=null?((mainCur-mainBase)/mainBase)*100:null);
-
+      mainVarAnual.push(mainCur!=null?((mainCur-mainAvgBase)/mainAvgBase)*100:null);
       allComponents.forEach(scian=>{
         const compSeries=getSeries(scian);
         if(!compSeries){componentContribs[scian].push(null);return;}
         const compKey=(serieKey==='des'&&compSeries.des)?'des':'org';
         const compArr2=getVals(compSeries,compKey)||getVals(compSeries,'org');
         if(!compArr2){componentContribs[scian].push(null);return;}
+        const compAvgBase=avgArr(compArr2,bF,bT);
         const compCur=compArr2[rawIdx];
-        const compBase=compArr2[baseIdx];
-        const compVA=(compCur!=null&&compBase!=null&&compBase!==0)?(compCur-compBase)/compBase:null;
-        // Peso fijo en el periodo base
-        const peso=getStructureWeight(scian,contribMainIndicator,contribBasePeriod,estObj);
+        const compVA=(compCur!=null&&compAvgBase!=null&&compAvgBase!==0)?(compCur-compAvgBase)/compAvgBase:null;
+        const peso=getStructureWeight(scian,contribMainIndicator,RAW.periods[bF],estObj);
         componentContribs[scian].push((compVA!=null&&peso!=null)?compVA*peso*100:null);
       });
     }
   } else {
-    // Mensual (lag=1) o Anual (lag=12)
-    const lag=contribVarType==='A'?12:1;
+    // Modos mensuales (MD, MA) y trimestrales (TD, TA)
+    const lag=modeLag;
+    // Para trimestral necesitamos al menos lag+2 índices de lookback
+    const minStart=isQuarterly?Math.max(fromIdx,lag+2):Math.max(fromIdx,lag);
 
-    for(let rawIdx=Math.max(fromIdx,lag);rawIdx<=toIdx;rawIdx++){
+    for(let rawIdx=minStart;rawIdx<=toIdx;rawIdx++){
+      const month=parseInt(RAW.periods[rawIdx].split('/')[1]);
+      // Para trimestral, solo procesar meses de fin de trimestre (mar,jun,sep,dic)
+      if(isQuarterly&&month%3!==0)continue;
+
       const periodLag=RAW.periods[rawIdx-lag];
-      visiblePeriods.push(RAW.periods[rawIdx]);
-
-      const mainCur=mainArr[rawIdx];
-      const mainPrev=mainArr[rawIdx-lag];
+      // Valores: punto para mensual, promedio trimestral para trimestral
+      const mainCur=isQuarterly?avgArr(mainArr,rawIdx-2,rawIdx):mainArr[rawIdx];
+      const mainPrev=isQuarterly?avgArr(mainArr,rawIdx-lag-2,rawIdx-lag):mainArr[rawIdx-lag];
+      const label=isQuarterly?RAW.periods[rawIdx].split('/')[0]+'-Q'+Math.ceil(month/3):RAW.periods[rawIdx];
+      visiblePeriods.push(label);
       mainVarAnual.push((mainCur!=null&&mainPrev!=null&&mainPrev!==0)?((mainCur-mainPrev)/mainPrev)*100:null);
 
       allComponents.forEach(scian=>{
@@ -1608,8 +1677,8 @@ function renderContribuciones(){
         const compKey=(serieKey==='des'&&compSeries.des)?'des':'org';
         const compArr2=getVals(compSeries,compKey)||getVals(compSeries,'org');
         if(!compArr2){componentContribs[scian].push(null);return;}
-        const compCur=compArr2[rawIdx];
-        const compPrev=compArr2[rawIdx-lag];
+        const compCur=isQuarterly?avgArr(compArr2,rawIdx-2,rawIdx):compArr2[rawIdx];
+        const compPrev=isQuarterly?avgArr(compArr2,rawIdx-lag-2,rawIdx-lag):compArr2[rawIdx-lag];
         const compVA=(compCur!=null&&compPrev!=null&&compPrev!==0)?(compCur-compPrev)/compPrev:null;
         const peso=getStructureWeight(scian,contribMainIndicator,periodLag,estObj);
         componentContribs[scian].push((compVA!=null&&peso!=null)?compVA*peso*100:null);
@@ -1620,7 +1689,7 @@ function renderContribuciones(){
   // Prepare chart data
   const otherComponents=allComponents.filter(c=>!contribSelectedComponents.includes(c));
   const componentData=[];
-  lastContribData={periods:visiblePeriods,mainIndicator:mainSeries.name,serieType:serieKey,varType:contribVarType,basePeriod:contribBasePeriod,mainVarAnual,components:[]};
+  lastContribData={periods:visiblePeriods,mainIndicator:mainSeries.name,serieType:serieKey,varType:contribMode,basePeriod:contribBasePeriod,basePeriodLabel,endPeriodLabel,mainVarAnual,components:[]};
 
   contribSelectedComponents.forEach((scian,idx)=>{
     const s=getSeries(scian);
@@ -1643,7 +1712,7 @@ function renderContribuciones(){
   componentData.forEach(comp=>{
     datasets.push({type:'bar',label:comp.name,data:comp.contributions,backgroundColor:comp.color+'99',borderColor:comp.color,borderWidth:1,stack:'contributions',order:2});
   });
-  const lineLabel=contribVarType==='P'?`Var. acumulada desde ${(contribBasePeriod||'').replace('/','-')}`:'Variacion '+varTypeLabel+' total';
+  const lineLabel=contribMode==='P'?`Var. desde [${basePeriodLabel}]`:'Variacion total';
   datasets.push({type:'line',label:lineLabel,data:mainVarAnual,borderColor:'#0C1220',backgroundColor:'transparent',borderWidth:3,pointRadius:3,pointBackgroundColor:'#0C1220',tension:0.1,order:1});
 
   const allValues=[...mainVarAnual.filter(v=>v!=null)];
@@ -1663,7 +1732,8 @@ function renderContribuciones(){
 function downloadContribExcel(){
   if(!lastContribData){alert('No hay datos para descargar.');return;}
   const wb=XLSX.utils.book_new();
-  const varHdr=lastContribData.varType==='A'?'Var. Anual Total (%)':lastContribData.varType==='P'?`Var. Acumulada desde ${(lastContribData.basePeriod||'').replace('/','-')} (%)`:'Var. Mensual Total (%)';
+  const varHdrMap={MD:'Var. mensual desest. (%)',MA:'Var. anual original (%)',TD:'Var. trimestral desest. (%)',TA:'Var. anual original trim. (%)',P:`Var. acumulada [${lastContribData.basePeriodLabel||''}] vs [${lastContribData.endPeriodLabel||''}] (%)`};
+  const varHdr=varHdrMap[lastContribData.varType]||'Variacion (%)';
   const headers=['Periodo',varHdr];
   lastContribData.components.forEach(c=>{headers.push('Contrib. '+c.name+' (pp)');});
   const data=[headers];
@@ -1861,7 +1931,8 @@ function redrawAll(){
 
 function initDashboard(){
   toIdx=RAW.periods.length-1;
-  fromIdx=Math.max(0,toIdx-119);
+  const jan2022=RAW.periods.indexOf('2022/01');
+  fromIdx=jan2022>=0?jan2022:Math.max(0,toIdx-119);
   RAW.periods.forEach((p,i)=>{selFrom.appendChild(new Option(p.replace('/','-'),i));selTo.appendChild(new Option(p.replace('/','-'),i));});
   selFrom.value=fromIdx;
   selTo.value=toIdx;
